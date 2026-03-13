@@ -44,6 +44,45 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ════════════════════════════════════════════════════
+# AUTENTICACION
+# ════════════════════════════════════════════════════
+USUARIOS = {
+    "etcheoscar": "oscar2026",
+}
+
+def login():
+    """Pantalla de login."""
+    st.markdown("""
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 40px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("### Liquidacion de Sueldos")
+        st.markdown("Ingrese sus credenciales para acceder al sistema.")
+        usuario = st.text_input("Usuario", key="login_user")
+        clave = st.text_input("Contrasena", type="password", key="login_pass")
+        if st.button("Ingresar", use_container_width=True):
+            if usuario in USUARIOS and USUARIOS[usuario] == clave:
+                st.session_state["autenticado"] = True
+                st.session_state["usuario"] = usuario
+                st.rerun()
+            else:
+                st.error("Usuario o contrasena incorrectos.")
+    st.stop()
+
+if not st.session_state.get("autenticado", False):
+    login()
+
 # Mostrar mensajes de éxito pendientes (por rerun)
 if 'mensaje_exito' in st.session_state:
     st.success(st.session_state.mensaje_exito)
