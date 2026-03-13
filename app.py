@@ -97,6 +97,17 @@ def login():
             color: #475569;
             margin-top: 24px;
         }
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .login-card {
+                padding: 32px 20px;
+                margin: 0 8px;
+                border-radius: 16px;
+            }
+            .login-icon { font-size: 44px; }
+            .login-title { font-size: 22px; }
+            .login-subtitle { font-size: 13px; margin-bottom: 20px; }
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -323,6 +334,46 @@ st.markdown("""
     }
     div[data-testid="stNotification"] p {
         color: #ffffff !important;
+    }
+
+    /* ═══ MOBILE RESPONSIVE ═══ */
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding: 0.5rem 0.8rem !important;
+        }
+        section[data-testid="stSidebar"] {
+            min-width: 260px !important;
+        }
+        /* Botones touch-friendly */
+        .stButton > button {
+            min-height: 44px !important;
+            font-size: 14px !important;
+            padding: 0.5rem 1rem !important;
+        }
+        /* Tabs mas grandes en movil */
+        .stTabs [data-baseweb="tab"] {
+            font-size: 13px !important;
+            padding: 8px 12px !important;
+        }
+        /* Inputs mas grandes para touch */
+        .stTextInput input, .stSelectbox select, .stNumberInput input {
+            min-height: 44px !important;
+            font-size: 16px !important;
+        }
+        /* Tablas scrolleables */
+        .stDataFrame {
+            overflow-x: auto !important;
+        }
+        /* Reducir margenes de metricas */
+        div[data-testid="stMetric"] {
+            padding: 8px !important;
+        }
+        div[data-testid="stMetric"] label {
+            font-size: 11px !important;
+        }
+        div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+            font-size: 18px !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
