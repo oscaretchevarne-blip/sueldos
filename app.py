@@ -52,32 +52,76 @@ USUARIOS = {
 }
 
 def login():
-    """Pantalla de login."""
+    """Pantalla de login elegante."""
     st.markdown("""
     <style>
-        .login-container {
-            max-width: 400px;
-            margin: 100px auto;
-            padding: 40px;
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        .stApp {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%) !important;
+        }
+        .login-card {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 20px;
+            padding: 48px 40px;
+            max-width: 420px;
+            margin: 0 auto;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.1);
+        }
+        .login-icon {
+            font-size: 56px;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .login-title {
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 28px;
+            text-align: center;
+            color: #f1f5f9;
+            margin-bottom: 4px;
+        }
+        .login-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 14px;
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 32px;
+        }
+        .login-footer {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            text-align: center;
+            color: #475569;
+            margin-top: 24px;
         }
     </style>
     """, unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        st.markdown("### Liquidacion de Sueldos")
-        st.markdown("Ingrese sus credenciales para acceder al sistema.")
-        usuario = st.text_input("Usuario", key="login_user")
-        clave = st.text_input("Contrasena", type="password", key="login_pass")
-        if st.button("Ingresar", use_container_width=True):
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        st.markdown('<div class="login-icon">💰</div>', unsafe_allow_html=True)
+        st.markdown('<div class="login-title">Liquidacion de Sueldos</div>', unsafe_allow_html=True)
+        st.markdown('<div class="login-subtitle">Ingrese sus credenciales para acceder al sistema</div>', unsafe_allow_html=True)
+
+        usuario = st.text_input("👤 Usuario", key="login_user", placeholder="Ingrese su usuario")
+        clave = st.text_input("🔒 Contrasena", type="password", key="login_pass", placeholder="Ingrese su contrasena")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔓  INGRESAR AL SISTEMA", use_container_width=True, type="primary"):
             if usuario in USUARIOS and USUARIOS[usuario] == clave:
                 st.session_state["autenticado"] = True
                 st.session_state["usuario"] = usuario
                 st.rerun()
             else:
-                st.error("Usuario o contrasena incorrectos.")
+                st.error("❌ Usuario o contrasena incorrectos.")
+
+        st.markdown('<div class="login-footer">Sistema protegido · Acceso autorizado unicamente</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
 if not st.session_state.get("autenticado", False):
@@ -300,6 +344,14 @@ if 'periodo_anio' not in st.session_state:
 # ════════════════════════════════════════════════════
 with st.sidebar:
     st.markdown("## 💰 Liquidación de Sueldos")
+    col_user, col_logout = st.columns([3, 1])
+    with col_user:
+        st.caption(f"👤 {st.session_state.get('usuario', '')}")
+    with col_logout:
+        if st.button("🚪", help="Cerrar sesion", key="btn_logout"):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
     st.markdown("---")
 
     # ── Selección de período ──
