@@ -338,42 +338,113 @@ st.markdown("""
 
     /* ═══ MOBILE RESPONSIVE ═══ */
     @media (max-width: 768px) {
+        /* Container principal - menos padding */
         .main .block-container {
-            padding: 0.5rem 0.8rem !important;
+            padding: 0.3rem 0.5rem !important;
+            max-width: 100% !important;
         }
+
+        /* Sidebar mas angosta en movil */
         section[data-testid="stSidebar"] {
-            min-width: 260px !important;
+            min-width: 240px !important;
+            max-width: 280px !important;
         }
-        /* Botones touch-friendly */
-        .stButton > button {
-            min-height: 44px !important;
-            font-size: 14px !important;
-            padding: 0.5rem 1rem !important;
+        section[data-testid="stSidebar"] .block-container {
+            padding: 0.5rem !important;
         }
-        /* Tabs mas grandes en movil */
+
+        /* Columnas: forzar stack vertical en movil */
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 4px !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+            width: 100% !important;
+        }
+
+        /* Tabs: scroll horizontal, no wrap */
+        .stTabs [data-baseweb="tab-list"] {
+            overflow-x: auto !important;
+            flex-wrap: nowrap !important;
+            gap: 4px !important;
+            padding: 4px 0 !important;
+            -webkit-overflow-scrolling: touch;
+        }
         .stTabs [data-baseweb="tab"] {
-            font-size: 13px !important;
-            padding: 8px 12px !important;
+            font-size: 12px !important;
+            padding: 6px 10px !important;
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
         }
+
+        /* Glassmorphism containers: menos padding */
+        div.stExpander, div[data-testid="stForm"], .stTabs [data-baseweb="tab-panel"] {
+            padding: 0.6rem !important;
+            border-radius: 8px !important;
+        }
+
+        /* Botones touch-friendly */
+        .stButton > button, div[data-testid="stDownloadButton"] > button {
+            min-height: 44px !important;
+            font-size: 13px !important;
+            padding: 0.4rem 0.8rem !important;
+            width: 100% !important;
+            letter-spacing: 0 !important;
+            text-transform: none !important;
+        }
+
         /* Inputs mas grandes para touch */
-        .stTextInput input, .stSelectbox select, .stNumberInput input {
+        .stTextInput input, .stNumberInput input,
+        div[data-baseweb="select"] {
             min-height: 44px !important;
             font-size: 16px !important;
         }
-        /* Tablas scrolleables */
-        .stDataFrame {
+
+        /* Tablas: scroll horizontal y texto mas chico */
+        .stDataFrame, div[data-testid="stDataFrame"] {
             overflow-x: auto !important;
+            max-width: 100% !important;
         }
-        /* Reducir margenes de metricas */
-        div[data-testid="stMetric"] {
-            padding: 8px !important;
-        }
-        div[data-testid="stMetric"] label {
+        .stDataFrame table {
             font-size: 11px !important;
         }
-        div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-            font-size: 18px !important;
+
+        /* Metricas compactas */
+        div[data-testid="stMetric"] {
+            padding: 6px !important;
         }
+        div[data-testid="stMetric"] label {
+            font-size: 10px !important;
+        }
+        div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+            font-size: 16px !important;
+        }
+
+        /* Titulos mas chicos */
+        h1 { font-size: 1.3rem !important; }
+        h2 { font-size: 1.1rem !important; }
+        h3 { font-size: 1rem !important; }
+
+        /* Expanders mas compactos */
+        details[data-testid="stExpander"] summary {
+            font-size: 13px !important;
+            padding: 8px !important;
+        }
+
+        /* Checkboxes */
+        div[data-testid="stCheckbox"] {
+            padding: 4px 8px !important;
+        }
+
+        /* Selectbox labels */
+        .stSelectbox label, .stTextInput label, .stNumberInput label {
+            font-size: 12px !important;
+        }
+
+        /* Ocultar elementos decorativos pesados en movil */
+        .stDeployButton { display: none !important; }
     }
 </style>
 """, unsafe_allow_html=True)
