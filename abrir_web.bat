@@ -1,4 +1,4 @@
 @echo off
 echo Abriendo Sistema de Sueldos en la web...
-start https://sueldos-ev789ng6wvcvrsqgsvdu3c.streamlit.app/
+start https://sueldos-fd4gwmwkfs34zaqnuxzkjb.streamlit.app/
 pause
