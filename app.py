@@ -910,8 +910,36 @@ with tab_admin:
                             continue
                     return d
                 df_emp['fecha_ingreso'] = df_emp['fecha_ingreso'].apply(_fmt_date)
-            
-            cols_mostrar = ['id', 'apellido_nombre', 'cuil', 'tipo', 'seccion', 'categoria', 'fecha_ingreso', 'estado']
+
+            # Agregar columnas de valor básico/hora y flags SI/NO
+            if not df_emp.empty:
+                valores_basico = []
+                for _, row in df_emp.iterrows():
+                    cat_nombre = row.get('categoria', '')
+                    tipo = row.get('tipo', '')
+                    fuera = row.get('fuera_convenio', 0)
+                    if fuera and row.get('sueldo_base', 0) > 0:
+                        if tipo == 'MENSUALIZADO':
+                            valores_basico.append(f"${row['sueldo_base']:,.0f}")
+                        else:
+                            valores_basico.append(f"${row['sueldo_base']:,.0f}/h")
+                    elif cat_nombre:
+                        cat_val = db.get_valor_categoria(cat_nombre, m, a)
+                        if cat_val:
+                            if tipo == 'MENSUALIZADO':
+                                valores_basico.append(f"${cat_val.get('valor_mensual', 0):,.0f}")
+                            else:
+                                valores_basico.append(f"${cat_val.get('valor_hora', 0):,.0f}/h")
+                        else:
+                            valores_basico.append('-')
+                    else:
+                        valores_basico.append('-')
+                df_emp['basico_hora'] = valores_basico
+                df_emp['liq_basico'] = df_emp.get('liquida_mensual', pd.Series([0]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
+                df_emp['ant_basico'] = df_emp.get('liquida_antiguedad_basico', pd.Series([0]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
+                df_emp['liq_present'] = df_emp.get('liquida_presentismo', pd.Series([1]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
+
+            cols_mostrar = ['id', 'apellido_nombre', 'cuil', 'tipo', 'seccion', 'categoria', 'basico_hora', 'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado']
             cols_existentes = [c for c in cols_mostrar if c in df_emp.columns]
 
             # Tablas de empleados separadas por condición
@@ -921,20 +949,25 @@ with tab_admin:
                 df_perm = df_emp[df_emp.get('condicion', 'PERMANENTE') == 'PERMANENTE']
                 st.markdown(f"**{len(df_perm)} permanentes**")
                 if not df_perm.empty:
+                    _col_cfg = {
+                            'id': st.column_config.NumberColumn('ID', width=50),
+                            'apellido_nombre': st.column_config.TextColumn('Apellido y Nombre', width=180),
+                            'cuil': st.column_config.TextColumn('CUIL', width=110),
+                            'tipo': st.column_config.TextColumn('Tipo', width=90),
+                            'seccion': st.column_config.TextColumn('Sección', width=90),
+                            'categoria': st.column_config.TextColumn('Categoría', width=130),
+                            'basico_hora': st.column_config.TextColumn('Básico/Hora', width=95),
+                            'liq_basico': st.column_config.TextColumn('Liq.Básico', width=70),
+                            'ant_basico': st.column_config.TextColumn('Ant.s/Básico', width=75),
+                            'liq_present': st.column_config.TextColumn('Presentismo', width=75),
+                            'fecha_ingreso': st.column_config.TextColumn('F. Ingreso', width=85),
+                            'estado': st.column_config.TextColumn('Estado', width=70),
+                        }
                     st.dataframe(
                         _fmt_df(df_perm[cols_existentes]),
                         use_container_width=True,
                         hide_index=True,
-                        column_config={
-                            'id': st.column_config.NumberColumn('ID', width=50),
-                            'apellido_nombre': st.column_config.TextColumn('Apellido y Nombre', width=200),
-                            'cuil': st.column_config.TextColumn('CUIL', width=120),
-                            'tipo': st.column_config.TextColumn('Tipo', width=100),
-                            'seccion': st.column_config.TextColumn('Sección', width=100),
-                            'categoria': st.column_config.TextColumn('Categoría', width=150),
-                            'fecha_ingreso': st.column_config.TextColumn('F. Ingreso', width=100),
-                            'estado': st.column_config.TextColumn('Estado', width=80),
-                        }
+                        column_config=_col_cfg
                     )
                 else:
                     st.info("No hay empleados permanentes con estos filtros.")
@@ -947,16 +980,7 @@ with tab_admin:
                         _fmt_df(df_event[cols_existentes]),
                         use_container_width=True,
                         hide_index=True,
-                        column_config={
-                            'id': st.column_config.NumberColumn('ID', width=50),
-                            'apellido_nombre': st.column_config.TextColumn('Apellido y Nombre', width=200),
-                            'cuil': st.column_config.TextColumn('CUIL', width=120),
-                            'tipo': st.column_config.TextColumn('Tipo', width=100),
-                            'seccion': st.column_config.TextColumn('Sección', width=100),
-                            'categoria': st.column_config.TextColumn('Categoría', width=150),
-                            'fecha_ingreso': st.column_config.TextColumn('F. Ingreso', width=100),
-                            'estado': st.column_config.TextColumn('Estado', width=80),
-                        }
+                        column_config=_col_cfg
                     )
                 else:
                     st.info("No hay empleados eventuales con estos filtros.")

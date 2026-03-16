@@ -684,37 +684,31 @@ def generar_listado_empleados_pdf(df_empl):
     pdf.cell(0, 5, f'Generado el: {datetime.now().strftime("%d/%m/%Y %H:%M")}', 0, 1, 'R')
     pdf.ln(5)
 
-    # Columnas: id, apellido_nombre, cuil, tipo, seccion, categoria, fecha_ingreso, estado
-    # Definir anchos (Total ~277mm para A4 horizontal con margen)
-    col_widths = [10, 65, 30, 25, 45, 45, 30, 20]
-    headers = ['ID', 'Apellido y Nombre', 'CUIL', 'Tipo', 'Sección', 'Categoría', 'F. Ingreso', 'Estado']
+    # Columnas con nuevos campos
+    col_widths = [10, 55, 28, 22, 32, 32, 25, 18, 18, 18, 22, 17]
+    headers = ['ID', 'Apellido y Nombre', 'CUIL', 'Tipo', 'Seccion', 'Categoria', 'Basico/Hora', 'Liq.Bas', 'Ant.Bas', 'Present', 'F.Ingreso', 'Estado']
+    col_keys = ['id', 'apellido_nombre', 'cuil', 'tipo', 'seccion', 'categoria', 'basico_hora', 'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado']
 
-    pdf.set_font('Helvetica', 'B', 9)
-    pdf.set_fill_color(240, 240, 240)
-    for i, h in enumerate(headers):
-        pdf.cell(col_widths[i], 7, _ascii(h), 1, 0, 'C', fill=True)
-    pdf.ln()
+    def _print_header():
+        pdf.set_font('Helvetica', 'B', 7.5)
+        pdf.set_fill_color(240, 240, 240)
+        for i, h in enumerate(headers):
+            pdf.cell(col_widths[i], 7, _ascii(h), 1, 0, 'C', fill=True)
+        pdf.ln()
 
-    pdf.set_font('Helvetica', '', 8.5)
+    _print_header()
+
+    pdf.set_font('Helvetica', '', 7.5)
     for _, row in df_empl.iterrows():
-        # Prevenir desborde de pagina
         if pdf.get_y() > 180:
             pdf.add_page()
-            # Repetir cabecera
-            pdf.set_font('Helvetica', 'B', 9)
-            for i, h in enumerate(headers):
-                pdf.cell(col_widths[i], 7, _ascii(h), 1, 0, 'C', fill=True)
-            pdf.ln()
-            pdf.set_font('Helvetica', '', 8.5)
+            _print_header()
+            pdf.set_font('Helvetica', '', 7.5)
 
-        pdf.cell(col_widths[0], 6, str(row.get('id', '')), 1)
-        pdf.cell(col_widths[1], 6, _ascii(row.get('apellido_nombre', '')), 1)
-        pdf.cell(col_widths[2], 6, _ascii(row.get('cuil', '')), 1)
-        pdf.cell(col_widths[3], 6, _ascii(row.get('tipo', '')), 1)
-        pdf.cell(col_widths[4], 6, _ascii(row.get('seccion', '')), 1)
-        pdf.cell(col_widths[5], 6, _ascii(row.get('categoria', '')), 1)
-        pdf.cell(col_widths[6], 6, _ascii(row.get('fecha_ingreso', '')), 1)
-        pdf.cell(col_widths[7], 6, _ascii(row.get('estado', '')), 1)
+        for i, key in enumerate(col_keys):
+            val = str(row.get(key, ''))
+            align = 'C' if key in ('id', 'liq_basico', 'ant_basico', 'liq_present', 'estado') else 'L'
+            pdf.cell(col_widths[i], 5.5, _ascii(val), 1, 0, align)
         pdf.ln()
 
     return _safe_pdf_output(pdf)
