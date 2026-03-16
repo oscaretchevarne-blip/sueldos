@@ -685,9 +685,9 @@ def generar_listado_empleados_pdf(df_empl):
     pdf.ln(5)
 
     # Columnas con nuevos campos
-    col_widths = [10, 55, 28, 22, 32, 32, 25, 18, 18, 18, 22, 17]
-    headers = ['ID', 'Apellido y Nombre', 'CUIL', 'Tipo', 'Seccion', 'Categoria', 'Basico/Hora', 'Liq.Bas', 'Ant.Bas', 'Present', 'F.Ingreso', 'Estado']
-    col_keys = ['id', 'apellido_nombre', 'cuil', 'tipo', 'seccion', 'categoria', 'basico_hora', 'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado']
+    col_widths = [10, 50, 27, 22, 22, 28, 30, 25, 16, 16, 16, 20, 15]
+    headers = ['ID', 'Apellido y Nombre', 'CUIL', 'Tipo', 'Condic.', 'Seccion', 'Categoria', 'Basico/Hora', 'L.Bas', 'A.Bas', 'Pres.', 'F.Ingreso', 'Estado']
+    col_keys = ['id', 'apellido_nombre', 'cuil', 'tipo', 'condicion', 'seccion', 'categoria', 'basico_hora', 'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado']
 
     def _print_header():
         pdf.set_font('Helvetica', 'B', 7.5)

@@ -683,10 +683,18 @@ with tab_admin:
                                     try:
                                         fi = datetime.strptime(fi, '%Y-%m-%d').date()
                                     except:
-                                        fi = date.today()
+                                        try:
+                                            fi = datetime.strptime(fi, '%d/%m/%Y').date()
+                                        except:
+                                            fi = date.today()
                                 elif not fi:
                                     fi = date.today()
-                                fecha_ing = st.date_input("Fecha de ingreso", value=fi, disabled=not desbloqueado, key=f"emp_fi_{emp_id}")
+                                fi_str = fi.strftime('%d/%m/%Y') if isinstance(fi, date) else ''
+                                fecha_ing_str = st.text_input("Fecha de ingreso (DD/MM/AAAA)", value=fi_str, disabled=not desbloqueado, key=f"emp_fi_{emp_id}")
+                                try:
+                                    fecha_ing = datetime.strptime(fecha_ing_str, '%d/%m/%Y').date()
+                                except:
+                                    fecha_ing = fi
                                 liq_mensual = st.checkbox("¿Liquida mensual?", value=bool(emp.get('liquida_mensual', 0)), disabled=not desbloqueado, key=f"emp_lm_{emp_id}")
                                 liq_ant_bas = st.checkbox("¿Liquida antigüedad sobre básico?",
                                                         value=bool(emp.get('liquida_antiguedad_basico', 0)), disabled=not desbloqueado, key=f"emp_lab_{emp_id}")
@@ -824,7 +832,11 @@ with tab_admin:
                             sueldo_base = st.number_input(label_val, value=db_val, key="new_emp_sb")
                             estado = st.selectbox("Estado", ["ACTIVO", "INACTIVO"], key="new_emp_est")
                     with col2:
-                        fecha_ing = st.date_input("Fecha de ingreso", key="new_emp_fi")
+                        fecha_ing_str_new = st.text_input("Fecha de ingreso (DD/MM/AAAA)", value=date.today().strftime('%d/%m/%Y'), key="new_emp_fi")
+                        try:
+                            fecha_ing = datetime.strptime(fecha_ing_str_new, '%d/%m/%Y').date()
+                        except:
+                            fecha_ing = date.today()
                         liq_mensual = st.checkbox("¿Liquida mensual?", key="new_emp_lm")
                         liq_ant_bas = st.checkbox("¿Liquida antigüedad sobre básico?", key="new_emp_lab")
                         liq_present = st.checkbox("¿Liquida presentismo?", value=True, key="new_emp_lp")
@@ -913,33 +925,38 @@ with tab_admin:
 
             # Agregar columnas de valor básico/hora y flags SI/NO
             if not df_emp.empty:
+                def _fmt_basico(v):
+                    """Formato argentino: punto miles, coma decimales."""
+                    if v == 0: return '-'
+                    txt = f"{v:,.2f}"
+                    txt = txt.replace(',', 'X').replace('.', ',').replace('X', '.')
+                    return f"${txt}"
+
                 valores_basico = []
+                valores_basico_num = []
                 for _, row in df_emp.iterrows():
                     cat_nombre = row.get('categoria', '')
                     tipo = row.get('tipo', '')
                     fuera = row.get('fuera_convenio', 0)
+                    val = 0.0
                     if fuera and row.get('sueldo_base', 0) > 0:
-                        if tipo == 'MENSUALIZADO':
-                            valores_basico.append(f"${row['sueldo_base']:,.0f}")
-                        else:
-                            valores_basico.append(f"${row['sueldo_base']:,.0f}/h")
+                        val = float(row['sueldo_base'])
                     elif cat_nombre:
                         cat_val = db.get_valor_categoria(cat_nombre, m, a)
                         if cat_val:
                             if tipo == 'MENSUALIZADO':
-                                valores_basico.append(f"${cat_val.get('valor_mensual', 0):,.0f}")
+                                val = float(cat_val.get('valor_mensual', 0))
                             else:
-                                valores_basico.append(f"${cat_val.get('valor_hora', 0):,.0f}/h")
-                        else:
-                            valores_basico.append('-')
-                    else:
-                        valores_basico.append('-')
+                                val = float(cat_val.get('valor_hora', 0))
+                    valores_basico.append(_fmt_basico(val))
+                    valores_basico_num.append(val)
                 df_emp['basico_hora'] = valores_basico
+                df_emp['basico_hora_num'] = valores_basico_num
                 df_emp['liq_basico'] = df_emp.get('liquida_mensual', pd.Series([0]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
                 df_emp['ant_basico'] = df_emp.get('liquida_antiguedad_basico', pd.Series([0]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
                 df_emp['liq_present'] = df_emp.get('liquida_presentismo', pd.Series([1]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
 
-            cols_mostrar = ['id', 'apellido_nombre', 'cuil', 'tipo', 'seccion', 'categoria', 'basico_hora', 'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado']
+            cols_mostrar = ['id', 'apellido_nombre', 'cuil', 'tipo', 'condicion', 'seccion', 'categoria', 'basico_hora', 'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado']
             cols_existentes = [c for c in cols_mostrar if c in df_emp.columns]
 
             # Tablas de empleados separadas por condición
@@ -951,17 +968,18 @@ with tab_admin:
                 if not df_perm.empty:
                     _col_cfg = {
                             'id': st.column_config.NumberColumn('ID', width=50),
-                            'apellido_nombre': st.column_config.TextColumn('Apellido y Nombre', width=180),
-                            'cuil': st.column_config.TextColumn('CUIL', width=110),
-                            'tipo': st.column_config.TextColumn('Tipo', width=90),
-                            'seccion': st.column_config.TextColumn('Sección', width=90),
-                            'categoria': st.column_config.TextColumn('Categoría', width=130),
-                            'basico_hora': st.column_config.TextColumn('Básico/Hora', width=95),
-                            'liq_basico': st.column_config.TextColumn('Liq.Básico', width=70),
-                            'ant_basico': st.column_config.TextColumn('Ant.s/Básico', width=75),
-                            'liq_present': st.column_config.TextColumn('Presentismo', width=75),
-                            'fecha_ingreso': st.column_config.TextColumn('F. Ingreso', width=85),
-                            'estado': st.column_config.TextColumn('Estado', width=70),
+                            'apellido_nombre': st.column_config.TextColumn('Apellido y Nombre', width=170),
+                            'cuil': st.column_config.TextColumn('CUIL', width=105),
+                            'tipo': st.column_config.TextColumn('Tipo', width=85),
+                            'condicion': st.column_config.TextColumn('Condición', width=85),
+                            'seccion': st.column_config.TextColumn('Sección', width=85),
+                            'categoria': st.column_config.TextColumn('Categoría', width=120),
+                            'basico_hora': st.column_config.TextColumn('Básico/Hora', width=90),
+                            'liq_basico': st.column_config.TextColumn('Liq.Básico', width=65),
+                            'ant_basico': st.column_config.TextColumn('Ant.s/Básico', width=70),
+                            'liq_present': st.column_config.TextColumn('Presentismo', width=70),
+                            'fecha_ingreso': st.column_config.TextColumn('F. Ingreso', width=80),
+                            'estado': st.column_config.TextColumn('Estado', width=65),
                         }
                     st.dataframe(
                         _fmt_df(df_perm[cols_existentes]),
@@ -1050,8 +1068,21 @@ with tab_admin:
                     st.error(f"Error generando PDF: {ex}")
             with c_e2:
                 buffer = io.BytesIO()
+                # Para Excel: usar columna numérica en vez de texto formateado
+                cols_excel = [c if c != 'basico_hora' else 'basico_hora_num' for c in cols_existentes]
+                cols_excel_exist = [c for c in cols_excel if c in df_emp.columns]
+                df_excel = df_emp[cols_excel_exist].copy()
+                df_excel = df_excel.rename(columns={'basico_hora_num': 'basico_hora'})
                 with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                    _fmt_df(df_emp[cols_existentes]).to_excel(writer, index=False, sheet_name='Personal')
+                    df_excel.to_excel(writer, index=False, sheet_name='Personal')
+                    workbook = writer.book
+                    worksheet = writer.sheets['Personal']
+                    money_fmt = workbook.add_format({'num_format': '$#.##0,00', 'align': 'right'})
+                    # Buscar columna basico_hora en el Excel
+                    col_idx = list(df_excel.columns).index('basico_hora') if 'basico_hora' in df_excel.columns else -1
+                    if col_idx >= 0:
+                        for row_num in range(1, len(df_excel) + 1):
+                            worksheet.write_number(row_num, col_idx, df_excel.iloc[row_num - 1][col_idx], money_fmt)
                 st.download_button(
                     "📊 Descargar Personal Excel",
                     data=buffer.getvalue(),
