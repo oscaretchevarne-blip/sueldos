@@ -959,28 +959,41 @@ with tab_admin:
             cols_mostrar = ['id', 'apellido_nombre', 'cuil', 'tipo', 'condicion', 'seccion', 'categoria', 'basico_hora', 'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado']
             cols_existentes = [c for c in cols_mostrar if c in df_emp.columns]
 
-            # Tablas de empleados separadas por condición
-            tab_perm, tab_event = st.tabs(["🏠 Permanentes", "📋 Eventuales"])
-            
-            with tab_perm:
-                df_perm = df_emp[df_emp.get('condicion', 'PERMANENTE') == 'PERMANENTE']
+            # Botones para elegir condición
+            _col_cfg = {
+                'id': st.column_config.NumberColumn('ID', width=50),
+                'apellido_nombre': st.column_config.TextColumn('Apellido y Nombre', width=170),
+                'cuil': st.column_config.TextColumn('CUIL', width=105),
+                'tipo': st.column_config.TextColumn('Tipo', width=85),
+                'condicion': st.column_config.TextColumn('Condición', width=85),
+                'seccion': st.column_config.TextColumn('Sección', width=85),
+                'categoria': st.column_config.TextColumn('Categoría', width=120),
+                'basico_hora': st.column_config.TextColumn('Básico/Hora', width=90),
+                'liq_basico': st.column_config.TextColumn('Liq.Básico', width=65),
+                'ant_basico': st.column_config.TextColumn('Ant.s/Básico', width=70),
+                'liq_present': st.column_config.TextColumn('Presentismo', width=70),
+                'fecha_ingreso': st.column_config.TextColumn('F. Ingreso', width=80),
+                'estado': st.column_config.TextColumn('Estado', width=65),
+            }
+            df_perm = df_emp[df_emp.get('condicion', 'PERMANENTE') == 'PERMANENTE']
+            df_event = df_emp[df_emp.get('condicion', 'PERMANENTE') == 'EVENTUAL']
+
+            if 'vista_personal' not in st.session_state:
+                st.session_state.vista_personal = None
+
+            btn_c1, btn_c2 = st.columns(2)
+            with btn_c1:
+                if st.button(f"🏠 Permanentes ({len(df_perm)})", use_container_width=True, type="primary" if st.session_state.vista_personal == 'perm' else "secondary"):
+                    st.session_state.vista_personal = 'perm' if st.session_state.vista_personal != 'perm' else None
+                    st.rerun()
+            with btn_c2:
+                if st.button(f"📋 Eventuales ({len(df_event)})", use_container_width=True, type="primary" if st.session_state.vista_personal == 'event' else "secondary"):
+                    st.session_state.vista_personal = 'event' if st.session_state.vista_personal != 'event' else None
+                    st.rerun()
+
+            if st.session_state.vista_personal == 'perm':
                 st.markdown(f"**{len(df_perm)} permanentes**")
                 if not df_perm.empty:
-                    _col_cfg = {
-                            'id': st.column_config.NumberColumn('ID', width=50),
-                            'apellido_nombre': st.column_config.TextColumn('Apellido y Nombre', width=170),
-                            'cuil': st.column_config.TextColumn('CUIL', width=105),
-                            'tipo': st.column_config.TextColumn('Tipo', width=85),
-                            'condicion': st.column_config.TextColumn('Condición', width=85),
-                            'seccion': st.column_config.TextColumn('Sección', width=85),
-                            'categoria': st.column_config.TextColumn('Categoría', width=120),
-                            'basico_hora': st.column_config.TextColumn('Básico/Hora', width=90),
-                            'liq_basico': st.column_config.TextColumn('Liq.Básico', width=65),
-                            'ant_basico': st.column_config.TextColumn('Ant.s/Básico', width=70),
-                            'liq_present': st.column_config.TextColumn('Presentismo', width=70),
-                            'fecha_ingreso': st.column_config.TextColumn('F. Ingreso', width=80),
-                            'estado': st.column_config.TextColumn('Estado', width=65),
-                        }
                     st.dataframe(
                         _fmt_df(df_perm[cols_existentes]),
                         use_container_width=True,
@@ -989,9 +1002,7 @@ with tab_admin:
                     )
                 else:
                     st.info("No hay empleados permanentes con estos filtros.")
-
-            with tab_event:
-                df_event = df_emp[df_emp.get('condicion', 'PERMANENTE') == 'EVENTUAL']
+            elif st.session_state.vista_personal == 'event':
                 st.markdown(f"**{len(df_event)} eventuales**")
                 if not df_event.empty:
                     st.dataframe(
@@ -1077,7 +1088,7 @@ with tab_admin:
                     df_excel.to_excel(writer, index=False, sheet_name='Personal')
                     workbook = writer.book
                     worksheet = writer.sheets['Personal']
-                    money_fmt = workbook.add_format({'num_format': '$#.##0,00', 'align': 'right'})
+                    money_fmt = workbook.add_format({'num_format': '$#,##0.00', 'align': 'right'})
                     # Buscar columna basico_hora en el Excel
                     col_idx = list(df_excel.columns).index('basico_hora') if 'basico_hora' in df_excel.columns else -1
                     if col_idx >= 0:
