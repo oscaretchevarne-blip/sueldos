@@ -454,11 +454,13 @@ st.markdown("""
 # ESTADO DE SESIÓN
 # ════════════════════════════════════════════════════
 if 'periodo_quincena' not in st.session_state:
-    st.session_state.periodo_quincena = 2
-if 'periodo_mes' not in st.session_state:
-    st.session_state.periodo_mes = 2
-if 'periodo_anio' not in st.session_state:
-    st.session_state.periodo_anio = 2026
+    _guardado = db.cargar_periodo_activo()
+    if _guardado:
+        st.session_state.periodo_quincena, st.session_state.periodo_mes, st.session_state.periodo_anio = _guardado
+    else:
+        st.session_state.periodo_quincena = 2
+        st.session_state.periodo_mes = 2
+        st.session_state.periodo_anio = 2026
 
 
 # ════════════════════════════════════════════════════
@@ -496,7 +498,10 @@ with st.sidebar:
     m = st.session_state.periodo_mes
     a = st.session_state.periodo_anio
     periodo_str = f"{q:02d}/{m:02d}/{str(a)[2:]}"
-    
+
+    # Persistir período activo en DB
+    db.guardar_periodo_activo(q, m, a)
+
     # Verificar estado del período
     periodo_actual = db.get_periodo(q, m, a)
     if periodo_actual and periodo_actual['estado'] == 'CERRADO':
@@ -2433,42 +2438,94 @@ with tab_informes:
         if empleados_todos:
             opciones_hist = {f"{e['apellido_nombre']}": e['id'] for e in empleados_todos}
             sel_hist = st.selectbox("Empleado", list(opciones_hist.keys()), index=None, placeholder="Buscá un empleado por nombre...", key="sel_hist_emp")
-            
+
             if not sel_hist:
                 st.info("Buscá y seleccioná un empleado para ver su historial de liquidaciones quincenales.")
             else:
                 historial = db.get_historial_empleado(opciones_hist[sel_hist])
                 if historial:
-                    df_hist_emp = pd.DataFrame([{
-                        'Período': f"{h['quincena']:02d}/{h['mes']:02d}/{h['anio']}",
-                        'Estado': h.get('periodo_estado', ''),
-                        'Tipo': h.get('tipo_liquidacion', ''),
-                        'Total Neto': h.get('total_neto', 0),
-                    } for h in historial])
-                    st.dataframe(_fmt_df(df_hist_emp), use_container_width=True, hide_index=True)
-
-                    # Exportar historial por empleado
-                    c_he1, c_he2 = st.columns(2)
-                    with c_he1:
-                        try:
-                            pdf_he = reports.generar_historial_emp_pdf(df_hist_emp, sel_hist)
-                            st.download_button(
-                                "📄 Descargar Historial PDF",
-                                data=pdf_he,
-                                file_name=f"Historial_{sel_hist.replace(' ', '_')}.pdf",
-                                mime="application/pdf"
-                            )
-                        except Exception as ex:
-                            st.error(f"Error generando PDF: {ex}")
-                    with c_he2:
-                        buffer = io.BytesIO()
-                        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                            df_hist_emp.to_excel(writer, index=False, sheet_name='Historial')
-                        st.download_button(
-                            "📊 Descargar Historial Excel",
-                            data=buffer.getvalue(),
-                            file_name=f"Historial_{sel_hist.replace(' ', '_')}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    # Filtro de períodos
+                    periodos_disponibles = [f"{h['quincena']:02d}/{h['mes']:02d}/{h['anio']}" for h in historial]
+                    col_filtro1, col_filtro2 = st.columns([2, 1])
+                    with col_filtro1:
+                        periodos_sel = st.multiselect(
+                            "Períodos", periodos_disponibles,
+                            default=periodos_disponibles,
+                            key="sel_hist_periodos",
+                            placeholder="Seleccioná uno o más períodos..."
                         )
+                    with col_filtro2:
+                        modo_hist = st.radio("Vista", ["Resumido", "Detallado"], horizontal=True, key="modo_hist")
+
+                    # Filtrar historial según períodos seleccionados
+                    hist_filtrado = [h for h in historial if f"{h['quincena']:02d}/{h['mes']:02d}/{h['anio']}" in periodos_sel]
+
+                    if hist_filtrado:
+                        if modo_hist == "Resumido":
+                            df_hist_emp = pd.DataFrame([{
+                                'Período': f"{h['quincena']:02d}/{h['mes']:02d}/{h['anio']}",
+                                'Estado': h.get('periodo_estado', ''),
+                                'Tipo': h.get('tipo_liquidacion', ''),
+                                'Total Haberes': h.get('total_haberes', 0),
+                                'Total Deducciones': h.get('total_deducciones', 0),
+                                'Total Neto': h.get('total_neto', 0),
+                            } for h in hist_filtrado])
+                        else:
+                            df_hist_emp = pd.DataFrame([{
+                                'Período': f"{h['quincena']:02d}/{h['mes']:02d}/{h['anio']}",
+                                'Estado': h.get('periodo_estado', ''),
+                                'Tipo': h.get('tipo_liquidacion', ''),
+                                'Hs Comunes': h.get('horas_comunes', 0),
+                                'Hs Extra 50%': h.get('horas_extra_50', 0),
+                                'Hs Extra 100%': h.get('horas_extra_100', 0),
+                                'Básico/Hs Comunes': h.get('importe_horas_comunes', 0) or h.get('importe_basico_mensual', 0),
+                                'Extra 50%': h.get('importe_extra_50', 0),
+                                'Extra 100%': h.get('importe_extra_100', 0),
+                                'Antigüedad': h.get('importe_antiguedad_total', 0),
+                                'Presentismo': h.get('importe_presentismo', 0),
+                                'Dif. Sueldo': h.get('importe_diferencia_sueldo', 0),
+                                'Premio Prod.': h.get('importe_premio_produccion', 0),
+                                'Cifra Fija': h.get('importe_cifra_fija', 0),
+                                'Trab. Varios': h.get('importe_trabajos_varios', 0),
+                                'Viáticos': h.get('importe_viaticos', 0),
+                                'Vacaciones': h.get('importe_vacaciones', 0),
+                                'Prop. Aguinaldo': h.get('importe_prop_aguinaldo', 0),
+                                'Jubilación': h.get('importe_jubilacion', 0),
+                                'Obra Social': h.get('importe_obra_social', 0),
+                                'Anticipos': h.get('importe_anticipos', 0),
+                                'Otros': h.get('importe_otros', 0),
+                                'Acred. Banco': h.get('importe_acreditacion_banco', 0),
+                                'Total Haberes': h.get('total_haberes', 0),
+                                'Total Deducciones': h.get('total_deducciones', 0),
+                                'Total Neto': h.get('total_neto', 0),
+                            } for h in hist_filtrado])
+
+                        st.dataframe(_fmt_df(df_hist_emp), use_container_width=True, hide_index=True)
+
+                        # Exportar historial por empleado
+                        c_he1, c_he2 = st.columns(2)
+                        with c_he1:
+                            try:
+                                pdf_he = reports.generar_historial_emp_pdf(df_hist_emp, sel_hist)
+                                st.download_button(
+                                    "📄 Descargar Historial PDF",
+                                    data=pdf_he,
+                                    file_name=f"Historial_{sel_hist.replace(' ', '_')}.pdf",
+                                    mime="application/pdf"
+                                )
+                            except Exception as ex:
+                                st.error(f"Error generando PDF: {ex}")
+                        with c_he2:
+                            buffer = io.BytesIO()
+                            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                                df_hist_emp.to_excel(writer, index=False, sheet_name='Historial')
+                            st.download_button(
+                                "📊 Descargar Historial Excel",
+                                data=buffer.getvalue(),
+                                file_name=f"Historial_{sel_hist.replace(' ', '_')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
+                    else:
+                        st.info("Seleccioná al menos un período.")
                 else:
                     st.info("Sin liquidaciones registradas para este empleado.")

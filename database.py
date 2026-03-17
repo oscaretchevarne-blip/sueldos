@@ -330,8 +330,46 @@ def init_db():
         WHERE apellido_nombre LIKE '%ZAPPALA%DELIA%'
     """)
 
+    # ──────────────────────────────────────────────
+    # CONFIGURACIÓN (período activo, etc.)
+    # ──────────────────────────────────────────────
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS config (
+            clave TEXT PRIMARY KEY,
+            valor TEXT NOT NULL
+        )
+    """)
+
     conn.commit()
     conn.close()
+
+
+# ──────────────────────────────────────────────────
+# FUNCIONES AUXILIARES - CONFIG (período activo)
+# ──────────────────────────────────────────────────
+def guardar_periodo_activo(quincena, mes, anio):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO config (clave, valor) VALUES ('periodo_q', ?)", (str(quincena),))
+    c.execute("INSERT OR REPLACE INTO config (clave, valor) VALUES ('periodo_m', ?)", (str(mes),))
+    c.execute("INSERT OR REPLACE INTO config (clave, valor) VALUES ('periodo_a', ?)", (str(anio),))
+    conn.commit()
+    conn.close()
+
+def cargar_periodo_activo():
+    """Devuelve (quincena, mes, anio) guardados o None si no hay."""
+    conn = get_connection()
+    try:
+        q = conn.execute("SELECT valor FROM config WHERE clave='periodo_q'").fetchone()
+        m = conn.execute("SELECT valor FROM config WHERE clave='periodo_m'").fetchone()
+        a = conn.execute("SELECT valor FROM config WHERE clave='periodo_a'").fetchone()
+        conn.close()
+        if q and m and a:
+            return int(q[0]), int(m[0]), int(a[0])
+        return None
+    except Exception:
+        conn.close()
+        return None
 
 
 # ──────────────────────────────────────────────────
