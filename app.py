@@ -963,8 +963,9 @@ with tab_admin:
                 df_emp['liq_basico'] = df_emp.get('liquida_mensual', pd.Series([0]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
                 df_emp['ant_basico'] = df_emp.get('liquida_antiguedad_basico', pd.Series([0]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
                 df_emp['liq_present'] = df_emp.get('liquida_presentismo', pd.Series([1]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
+                df_emp['conv'] = df_emp.get('fuera_convenio', pd.Series([0]*len(df_emp))).apply(lambda x: 'FC' if x else 'BC')
 
-            cols_mostrar = ['id', 'apellido_nombre', 'cuil', 'tipo', 'condicion', 'seccion', 'categoria', 'basico_hora',
+            cols_mostrar = ['id', 'apellido_nombre', 'cuil', 'tipo', 'condicion', 'seccion', 'categoria', 'conv', 'basico_hora',
                             'diferencia_sueldo', 'premio_produccion', 'cifra_fija', 'seguro', 'hs_fijas',
                             'jubilacion', 'obra_social', 'porc_presentismo', 'anticipos', 'otros',
                             'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado', 'observaciones']
@@ -979,6 +980,7 @@ with tab_admin:
                 'condicion': st.column_config.TextColumn('Condición', width=85),
                 'seccion': st.column_config.TextColumn('Sección', width=85),
                 'categoria': st.column_config.TextColumn('Categoría', width=120),
+                'conv': st.column_config.TextColumn('Conv.', width=40),
                 'basico_hora': st.column_config.TextColumn('Básico/Hora', width=90),
                 'diferencia_sueldo': st.column_config.NumberColumn('Dif. Sueldo', format="$%.2f", width=90),
                 'premio_produccion': st.column_config.NumberColumn('Premio Prod.', format="$%.2f", width=90),
@@ -1042,7 +1044,7 @@ with tab_admin:
                         workbook = writer.book
                         worksheet = writer.sheets[label_tipo]
                         # Formato pesos argentino: $1.234,56 (numerico, operable con formulas)
-                        money_fmt = workbook.add_format({'num_format': '[$$-2C0A]#.##0,00', 'align': 'right'})
+                        money_fmt = workbook.add_format({'num_format': '$#,##0.00', 'align': 'right'})
                         for cm in cols_money:
                             if cm in df_xl.columns:
                                 ci = list(df_xl.columns).index(cm)
@@ -1209,7 +1211,7 @@ with tab_admin:
                     df_excel.to_excel(writer, index=False, sheet_name='Personal')
                     workbook = writer.book
                     worksheet = writer.sheets['Personal']
-                    money_fmt = workbook.add_format({'num_format': '[$$-2C0A]#.##0,00', 'align': 'right'})
+                    money_fmt = workbook.add_format({'num_format': '$#,##0.00', 'align': 'right'})
                     for cm in cols_money_all:
                         if cm in df_excel.columns:
                             ci = list(df_excel.columns).index(cm)
