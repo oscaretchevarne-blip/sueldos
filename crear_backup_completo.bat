@@ -1,159 +1,210 @@
 @echo off
-setlocal
-
-:: --- CONFIGURACION ---
-set "APP_NAME=Sistema_Sueldos"
+setlocal enabledelayedexpansion
+title BACKUP PORTABLE - Sistema de Sueldos
 cd /d "%~dp0"
+
+set "APP_NAME=Sistema_Sueldos"
 set "SRC_DIR=%~dp0"
 
 :: Obtener fecha y hora
-for /f "tokens=*" %%a in ('powershell -Command "Get-Date -format 'yyyy-MM-dd_HHmm'"') do set "STAMP=%%a"
+for /f "tokens=*" %%a in ('powershell -NoProfile -Command "Get-Date -format 'yyyyMMdd_HHmm'"') do set "STAMP=%%a"
+if "%STAMP%"=="" set "STAMP=backup"
 
-if "%STAMP%"=="" (
-    set "STAMP=Desconocido"
-)
+set "BACKUP_NAME=%APP_NAME%_Portable_%STAMP%"
+set "BACKUP_BASE=C:\Antigravity Proyectos\BACKUP"
+if not exist "%BACKUP_BASE%" mkdir "%BACKUP_BASE%"
+set "BACKUP_DIR=%BACKUP_BASE%\%BACKUP_NAME%"
+set "ZIP_FILE=%BACKUP_BASE%\%BACKUP_NAME%.zip"
 
-set "BACKUP_DIR=%SRC_DIR%BACKUP_%APP_NAME%_%STAMP%"
-
+echo.
 echo ==================================================
-echo   GENERADOR DE BACKUP COMPLETO PARA %APP_NAME%
+echo   BACKUP PORTABLE - %APP_NAME%
 echo ==================================================
 echo.
-echo Creando carpeta de respaldo en:
-echo %BACKUP_DIR%
+echo   Incluye: App + Datos + Entorno Python completo
+echo   Destino: Escritorio\%BACKUP_NAME%.zip
+echo.
+echo ==================================================
 echo.
 
-:: Crear carpeta principal
-mkdir "%BACKUP_DIR%" 2>nul
+:: ============================================
+:: 1. CREAR CARPETA Y COPIAR ARCHIVOS CORE
+:: ============================================
+echo [1/6] Copiando archivos del sistema...
 
-:: ============================================
-:: 1. ARCHIVOS CORE (Python, Bat, Requirements)
-:: ============================================
-echo [1/5] Copiando archivos del sistema...
-copy "%SRC_DIR%*.py" "%BACKUP_DIR%\" /y >nul 2>nul
-copy "%SRC_DIR%*.bat" "%BACKUP_DIR%\" /y >nul 2>nul
-copy "%SRC_DIR%requirements.txt" "%BACKUP_DIR%\" /y >nul 2>nul
+if exist "%BACKUP_DIR%" rmdir /s /q "%BACKUP_DIR%"
+mkdir "%BACKUP_DIR%"
 
-:: ============================================
-:: 2. BASE DE DATOS PRINCIPAL
-:: ============================================
-echo [2/5] Copiando base de datos...
-if exist "%SRC_DIR%sueldos.db" (
-    xcopy "%SRC_DIR%sueldos.db" "%BACKUP_DIR%\" /y /k /h /r >nul
-    if not exist "%BACKUP_DIR%\sueldos.db" (
-        echo [ERROR CRITICO] No se pudo copiar sueldos.db!
-        pause
+:: Archivos Python principales
+for %%f in (app.py database.py calculator.py reports.py import_data.py) do (
+    if exist "%SRC_DIR%%%f" (
+        copy "%SRC_DIR%%%f" "%BACKUP_DIR%\" /y >nul
+    ) else (
+        echo        [FALTA] %%f
     )
+)
+copy "%SRC_DIR%requirements.txt" "%BACKUP_DIR%\" /y >nul 2>nul
+copy "%SRC_DIR%.gitignore" "%BACKUP_DIR%\" /y >nul 2>nul
+
+:: ============================================
+:: 2. BASE DE DATOS
+:: ============================================
+echo [2/6] Copiando base de datos...
+if exist "%SRC_DIR%sueldos.db" (
+    copy "%SRC_DIR%sueldos.db" "%BACKUP_DIR%\" /y >nul
 ) else (
-    echo [ADVERTENCIA] No se encontro sueldos.db en el origen.
+    echo        [ADVERTENCIA] No se encontro sueldos.db
 )
 
 :: ============================================
-:: 3. CARPETA DATA (PDFs, Excel de datos, etc)
+:: 3. CARPETAS DE DATOS
 :: ============================================
-echo [3/5] Copiando carpeta data...
+echo [3/6] Copiando carpetas de datos...
 if exist "%SRC_DIR%data\" (
-    mkdir "%BACKUP_DIR%\data" 2>nul
-    xcopy "%SRC_DIR%data\*.*" "%BACKUP_DIR%\data\" /y /k /h /r /e >nul 2>nul
-) else (
-    echo [INFO] No se encontro carpeta data.
+    xcopy "%SRC_DIR%data" "%BACKUP_DIR%\data\" /y /e /i /q >nul 2>nul
 )
-
-:: ============================================
-:: 4. CARPETA BACKUPS_CIERRE (respaldos de DB)
-:: ============================================
-echo [4/5] Copiando respaldos de cierre...
 if exist "%SRC_DIR%BACKUPS_CIERRE\" (
-    mkdir "%BACKUP_DIR%\BACKUPS_CIERRE" 2>nul
-    xcopy "%SRC_DIR%BACKUPS_CIERRE\*.*" "%BACKUP_DIR%\BACKUPS_CIERRE\" /y /k /h /r /e >nul 2>nul
-) else (
-    echo [INFO] No se encontro carpeta BACKUPS_CIERRE.
+    xcopy "%SRC_DIR%BACKUPS_CIERRE" "%BACKUP_DIR%\BACKUPS_CIERRE\" /y /e /i /q >nul 2>nul
 )
 
-:: ============================================
-:: 5. ARCHIVOS SUELTOS (Excel, PDF en raiz)
-:: ============================================
-echo [5/5] Copiando archivos adicionales...
-if exist "%SRC_DIR%*.xlsx" (
-    for %%f in ("%SRC_DIR%*.xlsx") do (
-        echo %%~nf | findstr /b "~$" >nul 2>nul
-        if errorlevel 1 (
-            copy "%%f" "%BACKUP_DIR%\" /y >nul 2>nul
+:: Archivos sueltos (Excel, PDF, CSV, JSON en raiz)
+for %%x in (xlsx pdf csv json) do (
+    if exist "%SRC_DIR%*.%%x" (
+        for %%f in ("%SRC_DIR%*.%%x") do (
+            echo %%~nf | findstr /b "~$" >nul 2>nul
+            if errorlevel 1 copy "%%f" "%BACKUP_DIR%\" /y >nul 2>nul
         )
     )
 )
-if exist "%SRC_DIR%*.pdf" copy "%SRC_DIR%*.pdf" "%BACKUP_DIR%\" /y >nul 2>nul
-if exist "%SRC_DIR%*.csv" copy "%SRC_DIR%*.csv" "%BACKUP_DIR%\" /y >nul 2>nul
-if exist "%SRC_DIR%*.json" copy "%SRC_DIR%*.json" "%BACKUP_DIR%\" /y >nul 2>nul
 
 :: ============================================
-:: ELIMINAR EL PROPIO BACKUP BAT DE LA COPIA
-:: (evita backups recursivos dentro del backup)
+:: 4. COPIAR BATs (excepto este backup bat)
 :: ============================================
-del "%BACKUP_DIR%\crear_backup_completo.bat" >nul 2>nul
+echo [4/6] Copiando scripts de ejecucion...
+for %%f in ("%SRC_DIR%*.bat") do (
+    if /I not "%%~nxf"=="crear_backup_completo.bat" (
+        copy "%%f" "%BACKUP_DIR%\" /y >nul 2>nul
+    )
+)
 
 :: ============================================
-:: INSTRUCCIONES DE INSTALACION
+:: 5. ENTORNO PYTHON PORTABLE
 :: ============================================
+echo [5/6] Creando entorno Python portable...
+echo        (esto puede tardar un momento)
+
+:: Buscar Python
+set "PY_CMD="
+if exist "%LOCALAPPDATA%\Programs\Python\Python314\python.exe" (
+    set "PY_CMD=%LOCALAPPDATA%\Programs\Python\Python314\python.exe"
+) else (
+    where py >nul 2>nul && set "PY_CMD=py"
+)
+if "%PY_CMD%"=="" (
+    where python >nul 2>nul && set "PY_CMD=python"
+)
+
+if "%PY_CMD%"=="" (
+    echo        [ERROR] No se encontro Python. El backup se crea sin entorno portable.
+    echo        En la otra PC debera instalar Python y ejecutar: pip install -r requirements.txt
+    goto :skip_venv
+)
+
+:: Crear venv en el backup
+%PY_CMD% -m venv "%BACKUP_DIR%\venv" >nul 2>nul
+if not exist "%BACKUP_DIR%\venv\Scripts\python.exe" (
+    echo        [ERROR] No se pudo crear el entorno virtual.
+    goto :skip_venv
+)
+
+:: Instalar dependencias en el venv del backup
+"%BACKUP_DIR%\venv\Scripts\pip.exe" install --quiet --disable-pip-version-check -r "%SRC_DIR%requirements.txt" >nul 2>nul
+if errorlevel 1 (
+    echo        [ADVERTENCIA] Algunas dependencias no se instalaron correctamente.
+) else (
+    echo        Entorno Python creado con todas las dependencias.
+)
+
+:: Crear launcher que usa el venv local
 (
-echo =============================================
-echo   %APP_NAME% - Backup Portatil
-echo   Fecha de creacion: %DATE% %TIME%
-echo =============================================
+echo @echo off
+echo cd /d "%%~dp0"
+echo echo Iniciando %APP_NAME%...
+echo echo.
 echo.
-echo CONTENIDO DE ESTE BACKUP:
-echo  - Archivos Python del sistema (.py^)
-echo  - Base de datos principal (sueldos.db^)
-echo  - Carpeta data/ con planillas y documentos
-echo  - Carpeta BACKUPS_CIERRE/ con respaldos
-echo  - iniciar_sueldos.bat para ejecutar el sistema
-echo  - requirements.txt con las dependencias
+echo :: Usar venv local si existe
+echo if exist "%%~dp0venv\Scripts\python.exe" ^(
+echo     "%%~dp0venv\Scripts\python.exe" -m streamlit run app.py
+echo     goto :end
+echo ^)
 echo.
-echo =============================================
-echo   INSTRUCCIONES PARA OTRA PC
-echo =============================================
+echo :: Fallback: buscar Python en el sistema
+echo py -m streamlit run app.py 2^>nul
+echo if %%errorlevel%%==0 goto :end
+echo python -m streamlit run app.py 2^>nul
+echo if %%errorlevel%%==0 goto :end
 echo.
-echo 1. Instalar Python 3.10 o superior desde:
-echo    https://www.python.org/downloads/
-echo    IMPORTANTE: Marcar "Add Python to PATH" durante la instalacion
+echo echo [ERROR] No se encontro Python con Streamlit.
+echo echo Instala Python desde https://www.python.org/downloads/
+echo echo Luego ejecuta: pip install -r requirements.txt
 echo.
-echo 2. Abrir una terminal (cmd^) en esta carpeta
-echo    (Click derecho en la carpeta ^> "Abrir en Terminal"^)
-echo.
-echo 3. Instalar dependencias ejecutando:
-echo    pip install -r requirements.txt
-echo.
-echo 4. Ejecutar iniciar_sueldos.bat para abrir el sistema
-echo.
-echo =============================================
-) > "%BACKUP_DIR%\LEEME_INSTRUCCIONES.txt"
+echo :end
+echo pause
+) > "%BACKUP_DIR%\INICIAR.bat"
+
+:: Sobreescribir el iniciar_sueldos.bat tambien
+copy "%BACKUP_DIR%\INICIAR.bat" "%BACKUP_DIR%\iniciar_sueldos.bat" /y >nul 2>nul
+
+:skip_venv
+
+:: ============================================
+:: 6. COMPRIMIR EN ZIP
+:: ============================================
+echo [6/6] Comprimiendo backup en ZIP...
+echo        (esto puede tardar unos minutos)
+
+if exist "%ZIP_FILE%" del "%ZIP_FILE%" >nul 2>nul
+powershell -NoProfile -Command "Compress-Archive -Path '%BACKUP_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force" 2>nul
+
+if exist "%ZIP_FILE%" (
+    echo        ZIP creado exitosamente.
+    :: Eliminar carpeta temporal
+    rmdir /s /q "%BACKUP_DIR%" >nul 2>nul
+) else (
+    echo        [INFO] No se pudo comprimir. La carpeta queda en el Escritorio.
+)
 
 :: ============================================
 :: VERIFICACION FINAL
 :: ============================================
 echo.
-echo --------------------------------------------------
-echo   VERIFICACION DEL BACKUP:
-echo --------------------------------------------------
+echo ==================================================
+echo   VERIFICACION DEL BACKUP
+echo ==================================================
+
 set "HAY_ERROR=0"
-
-if not exist "%BACKUP_DIR%\app.py" echo [FALTA] app.py & set "HAY_ERROR=1"
-if not exist "%BACKUP_DIR%\database.py" echo [FALTA] database.py & set "HAY_ERROR=1"
-if not exist "%BACKUP_DIR%\calculator.py" echo [FALTA] calculator.py & set "HAY_ERROR=1"
-if not exist "%BACKUP_DIR%\reports.py" echo [FALTA] reports.py & set "HAY_ERROR=1"
-if not exist "%BACKUP_DIR%\import_data.py" echo [FALTA] import_data.py & set "HAY_ERROR=1"
-if not exist "%BACKUP_DIR%\sueldos.db" echo [FALTA] sueldos.db & set "HAY_ERROR=1"
-if not exist "%BACKUP_DIR%\requirements.txt" echo [FALTA] requirements.txt & set "HAY_ERROR=1"
-if not exist "%BACKUP_DIR%\iniciar_sueldos.bat" echo [FALTA] iniciar_sueldos.bat & set "HAY_ERROR=1"
-
-if "%HAY_ERROR%"=="0" echo   Todos los archivos criticos estan presentes. OK
+if exist "%ZIP_FILE%" (
+    echo   [OK] ZIP creado: %ZIP_FILE%
+    for %%f in ("%ZIP_FILE%") do echo   [OK] Tamano: %%~zf bytes
+) else if exist "%BACKUP_DIR%\app.py" (
+    echo   [OK] Carpeta creada: %BACKUP_DIR%
+) else (
+    echo   [ERROR] No se genero el backup correctamente.
+    set "HAY_ERROR=1"
+)
 
 echo.
 echo ==================================================
-echo    RESPALDO COMPLETADO EXITOSAMENTE
+if "%HAY_ERROR%"=="0" (
+    echo   BACKUP PORTABLE COMPLETADO EXITOSAMENTE
+) else (
+    echo   BACKUP COMPLETADO CON ADVERTENCIAS
+)
 echo ==================================================
-echo Carpeta: %BACKUP_DIR%
 echo.
-echo Copia esta carpeta a un pendrive para llevarla a otra PC.
+echo   Para usar en otra PC:
+echo   1. Copiar el ZIP a la otra PC
+echo   2. Descomprimir en cualquier carpeta
+echo   3. Ejecutar INICIAR.bat
 echo.
 pause
