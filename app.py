@@ -137,6 +137,9 @@ def login():
 
 if not st.session_state.get("autenticado", False):
     login()
+else:
+    # Limpiar cualquier residuo visual del login
+    st.markdown("""<style>.login-card{display:none !important;}</style>""", unsafe_allow_html=True)
 
 # Mostrar mensajes de éxito pendientes (por rerun)
 if 'mensaje_exito' in st.session_state:
@@ -961,7 +964,10 @@ with tab_admin:
                 df_emp['ant_basico'] = df_emp.get('liquida_antiguedad_basico', pd.Series([0]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
                 df_emp['liq_present'] = df_emp.get('liquida_presentismo', pd.Series([1]*len(df_emp))).apply(lambda x: 'SI' if x else 'NO')
 
-            cols_mostrar = ['id', 'apellido_nombre', 'cuil', 'tipo', 'condicion', 'seccion', 'categoria', 'basico_hora', 'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado']
+            cols_mostrar = ['id', 'apellido_nombre', 'cuil', 'tipo', 'condicion', 'seccion', 'categoria', 'basico_hora',
+                            'diferencia_sueldo', 'premio_produccion', 'cifra_fija', 'seguro', 'hs_fijas',
+                            'jubilacion', 'obra_social', 'porc_presentismo', 'anticipos', 'otros',
+                            'liq_basico', 'ant_basico', 'liq_present', 'fecha_ingreso', 'estado', 'observaciones']
             cols_existentes = [c for c in cols_mostrar if c in df_emp.columns]
 
             # Botones para elegir condición
@@ -974,11 +980,22 @@ with tab_admin:
                 'seccion': st.column_config.TextColumn('Sección', width=85),
                 'categoria': st.column_config.TextColumn('Categoría', width=120),
                 'basico_hora': st.column_config.TextColumn('Básico/Hora', width=90),
+                'diferencia_sueldo': st.column_config.NumberColumn('Dif. Sueldo', format="$%.2f", width=90),
+                'premio_produccion': st.column_config.NumberColumn('Premio Prod.', format="$%.2f", width=90),
+                'cifra_fija': st.column_config.NumberColumn('Cifra Fija', format="$%.2f", width=85),
+                'seguro': st.column_config.NumberColumn('Seguro', format="$%.2f", width=80),
+                'hs_fijas': st.column_config.NumberColumn('Hs. Fijas', format="%.1f", width=65),
+                'jubilacion': st.column_config.NumberColumn('Jubilación', format="$%.2f", width=80),
+                'obra_social': st.column_config.NumberColumn('Obra Social', format="$%.2f", width=80),
+                'porc_presentismo': st.column_config.NumberColumn('% Present.', format="%.1f%%", width=70),
+                'anticipos': st.column_config.NumberColumn('Anticipos', format="$%.2f", width=85),
+                'otros': st.column_config.NumberColumn('Otros', format="$%.2f", width=80),
                 'liq_basico': st.column_config.TextColumn('Liq.Básico', width=65),
                 'ant_basico': st.column_config.TextColumn('Ant.s/Básico', width=70),
                 'liq_present': st.column_config.TextColumn('Presentismo', width=70),
                 'fecha_ingreso': st.column_config.TextColumn('F. Ingreso', width=80),
                 'estado': st.column_config.TextColumn('Estado', width=65),
+                'observaciones': st.column_config.TextColumn('Observaciones', width=120),
             }
             df_perm = df_emp[df_emp.get('condicion', 'PERMANENTE') == 'PERMANENTE']
             df_event = df_emp[df_emp.get('condicion', 'PERMANENTE') == 'EVENTUAL']
@@ -996,6 +1013,53 @@ with tab_admin:
                     st.session_state.vista_personal = 'event' if st.session_state.vista_personal != 'event' else None
                     st.rerun()
 
+            def _descargar_listado(df_vista, label_tipo):
+                """Genera botones de descarga PDF y Excel para un listado de empleados."""
+                c_dl1, c_dl2 = st.columns(2)
+                with c_dl1:
+                    try:
+                        pdf_data = reports.generar_listado_empleados_pdf(df_vista[cols_existentes])
+                        st.download_button(
+                            f"📄 Descargar {label_tipo} PDF",
+                            data=pdf_data,
+                            file_name=f"{label_tipo}_{datetime.now().strftime('%Y-%m-%d')}.pdf",
+                            mime="application/pdf",
+                            key=f"dl_pdf_{label_tipo}"
+                        )
+                    except Exception as ex:
+                        st.error(f"Error generando PDF: {ex}")
+                with c_dl2:
+                    buf = io.BytesIO()
+                    cols_xl = [c if c != 'basico_hora' else 'basico_hora_num' for c in cols_existentes]
+                    cols_xl_ok = [c for c in cols_xl if c in df_vista.columns]
+                    df_xl = df_vista[cols_xl_ok].copy()
+                    df_xl = df_xl.rename(columns={'basico_hora_num': 'basico_hora'})
+                    # Columnas monetarias para formatear en Excel
+                    cols_money = ['basico_hora', 'diferencia_sueldo', 'premio_produccion', 'cifra_fija',
+                                  'seguro', 'jubilacion', 'obra_social', 'anticipos', 'otros']
+                    with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
+                        df_xl.to_excel(writer, index=False, sheet_name=label_tipo)
+                        workbook = writer.book
+                        worksheet = writer.sheets[label_tipo]
+                        # Formato pesos argentino: $1.234,56 (numerico, operable con formulas)
+                        money_fmt = workbook.add_format({'num_format': '[$$-2C0A]#.##0,00', 'align': 'right'})
+                        for cm in cols_money:
+                            if cm in df_xl.columns:
+                                ci = list(df_xl.columns).index(cm)
+                                for ri in range(1, len(df_xl) + 1):
+                                    val = df_xl.iloc[ri - 1][cm]
+                                    try:
+                                        worksheet.write_number(ri, ci, round(float(val or 0), 2), money_fmt)
+                                    except (ValueError, TypeError):
+                                        pass
+                    st.download_button(
+                        f"📊 Descargar {label_tipo} Excel",
+                        data=buf.getvalue(),
+                        file_name=f"{label_tipo}_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_xl_{label_tipo}"
+                    )
+
             if st.session_state.vista_personal == 'perm':
                 st.markdown(f"**{len(df_perm)} permanentes**")
                 if not df_perm.empty:
@@ -1005,6 +1069,7 @@ with tab_admin:
                         hide_index=True,
                         column_config=_col_cfg
                     )
+                    _descargar_listado(df_perm, "Permanentes")
                 else:
                     st.info("No hay empleados permanentes con estos filtros.")
             elif st.session_state.vista_personal == 'event':
@@ -1016,6 +1081,7 @@ with tab_admin:
                         hide_index=True,
                         column_config=_col_cfg
                     )
+                    _descargar_listado(df_event, "Eventuales")
                 else:
                     st.info("No hay empleados eventuales con estos filtros.")
 
@@ -1029,44 +1095,62 @@ with tab_admin:
                     st.rerun()
             
             # Aumentos Masivos Fuera de Convenio
-            with st.expander("📈 Aumentos Masivos (Fuera de Convenio)"):
-                st.info("Esta herramienta permite aplicar un aumento porcentual al **Sueldo Básico** y a la **Diferencia de Sueldo** de los empleados Fuera de Convenio.")
-                
+            with st.expander("📈 Aumentos Masivos (Fuera de Convenio + Diferencia de Sueldo)"):
+                st.info("Esta herramienta aplica un aumento porcentual a:\n"
+                        "- **Fuera de Convenio:** Sueldo Básico + Diferencia de Sueldo\n"
+                        "- **Bajo Convenio con Dif. Sueldo > 0:** solo Diferencia de Sueldo")
+
                 col_inc1, col_inc2 = st.columns(2)
                 with col_inc1:
                     pct_inc = st.number_input("Porcentaje de aumento (%)", min_value=0.0, step=0.5, value=0.0, key="pct_inc_val")
                 with col_inc2:
                     sec_inc = st.selectbox("Sector (opcional)", ["Todos"] + db.get_secciones(), key="sec_inc_sel")
-                
+
                 sector_filter = None if sec_inc == "Todos" else sec_inc
-                
-                # Previsualización
+
+                # Previsualización: FC + Bajo Convenio con dif > 0
                 emps_fc = db.get_empleados(estado='ACTIVO', fuera_convenio=1, seccion=sector_filter)
-                
-                if emps_fc:
-                    st.markdown(f"**Previsualización:** {len(emps_fc)} empleados afectados.")
-                    preview_data = []
+                emps_bc_dif = [e for e in db.get_empleados(estado='ACTIVO', fuera_convenio=0, seccion=sector_filter) if float(e.get('diferencia_sueldo', 0) or 0) > 0]
+
+                total_afectados = len(emps_fc) + len(emps_bc_dif)
+                if total_afectados > 0:
                     factor = 1 + (pct_inc / 100.0)
-                    for ef in emps_fc:
-                        preview_data.append({
-                            'Nombre': ef['apellido_nombre'],
-                            'Básico Actual': ef['sueldo_base'],
-                            'Nvo. Básico': ef['sueldo_base'] * factor,
-                            'Dif. Actual': ef['diferencia_sueldo'],
-                            'Nva. Dif.': ef['diferencia_sueldo'] * factor
-                        })
-                    st.dataframe(_fmt_df(pd.DataFrame(preview_data)), use_container_width=True, hide_index=True)
-                    
+
+                    if emps_fc:
+                        st.markdown(f"**Fuera de Convenio:** {len(emps_fc)} empleados (Básico + Dif. Sueldo)")
+                        preview_fc = []
+                        for ef in emps_fc:
+                            preview_fc.append({
+                                'Nombre': ef['apellido_nombre'],
+                                'Básico Actual': ef['sueldo_base'],
+                                'Nvo. Básico': ef['sueldo_base'] * factor,
+                                'Dif. Actual': ef['diferencia_sueldo'],
+                                'Nva. Dif.': ef['diferencia_sueldo'] * factor
+                            })
+                        st.dataframe(_fmt_df(pd.DataFrame(preview_fc)), use_container_width=True, hide_index=True)
+
+                    if emps_bc_dif:
+                        st.markdown(f"**Bajo Convenio con Dif. Sueldo:** {len(emps_bc_dif)} empleados (solo Dif. Sueldo)")
+                        preview_bc = []
+                        for eb in emps_bc_dif:
+                            preview_bc.append({
+                                'Nombre': eb['apellido_nombre'],
+                                'Dif. Actual': eb['diferencia_sueldo'],
+                                'Nva. Dif.': eb['diferencia_sueldo'] * factor
+                            })
+                        st.dataframe(_fmt_df(pd.DataFrame(preview_bc)), use_container_width=True, hide_index=True)
+
+                    st.markdown(f"**Total empleados afectados: {total_afectados}**")
                     st.warning("⚠️ Al presionar el botón se modificarán permanentemente los valores en la base de datos.")
                     if st.button("🚀 Aplicar Aumento Masivo", type="primary", use_container_width=True):
                         if pct_inc <= 0:
                             st.error("El porcentaje debe ser mayor a cero.")
                         else:
                             db.aplicar_aumento_masivo_fc(pct_inc, sector_filter)
-                            st.success(f"✅ Se ha aplicado un aumento del {pct_inc}% a {len(emps_fc)} empleados.")
+                            st.success(f"✅ Aumento del {pct_inc}% aplicado a {total_afectados} empleados ({len(emps_fc)} FC + {len(emps_bc_dif)} Bajo Convenio con Dif.).")
                             st.rerun()
                 else:
-                    st.info("No hay empleados Fuera de Convenio activos para el sector seleccionado.")
+                    st.info("No hay empleados afectados para el sector seleccionado.")
 
                 # --- Retrotraer último aumento ---
                 st.divider()
@@ -1115,21 +1199,25 @@ with tab_admin:
                     st.error(f"Error generando PDF: {ex}")
             with c_e2:
                 buffer = io.BytesIO()
-                # Para Excel: usar columna numérica en vez de texto formateado
                 cols_excel = [c if c != 'basico_hora' else 'basico_hora_num' for c in cols_existentes]
                 cols_excel_exist = [c for c in cols_excel if c in df_emp.columns]
                 df_excel = df_emp[cols_excel_exist].copy()
                 df_excel = df_excel.rename(columns={'basico_hora_num': 'basico_hora'})
+                cols_money_all = ['basico_hora', 'diferencia_sueldo', 'premio_produccion', 'cifra_fija',
+                                  'seguro', 'jubilacion', 'obra_social', 'anticipos', 'otros']
                 with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                     df_excel.to_excel(writer, index=False, sheet_name='Personal')
                     workbook = writer.book
                     worksheet = writer.sheets['Personal']
-                    money_fmt = workbook.add_format({'num_format': '$#,##0.00', 'align': 'right'})
-                    # Buscar columna basico_hora en el Excel
-                    col_idx = list(df_excel.columns).index('basico_hora') if 'basico_hora' in df_excel.columns else -1
-                    if col_idx >= 0:
-                        for row_num in range(1, len(df_excel) + 1):
-                            worksheet.write_number(row_num, col_idx, df_excel.iloc[row_num - 1][col_idx], money_fmt)
+                    money_fmt = workbook.add_format({'num_format': '[$$-2C0A]#.##0,00', 'align': 'right'})
+                    for cm in cols_money_all:
+                        if cm in df_excel.columns:
+                            ci = list(df_excel.columns).index(cm)
+                            for ri in range(1, len(df_excel) + 1):
+                                try:
+                                    worksheet.write_number(ri, ci, round(float(df_excel.iloc[ri - 1][cm] or 0), 2), money_fmt)
+                                except (ValueError, TypeError):
+                                    pass
                 st.download_button(
                     "📊 Descargar Personal Excel",
                     data=buffer.getvalue(),
@@ -1285,23 +1373,27 @@ with tab_admin:
             else:
                 st.info("💡 Si no subís archivo, el período usará los valores de convenio ya cargados (del período anterior).")
 
-        # ── Pregunta de aumento a Fuera de Convenio ──
+        # ── Pregunta de aumento a Fuera de Convenio + Dif. Sueldo ──
         if 'pct_aumento_pendiente' in st.session_state:
             pct = st.session_state['pct_aumento_pendiente']
             emps_fc = db.get_empleados(estado='ACTIVO', fuera_convenio=1)
+            emps_bc_dif = [e for e in db.get_empleados(estado='ACTIVO', fuera_convenio=0) if float(e.get('diferencia_sueldo', 0) or 0) > 0]
             n_fc = len(emps_fc)
+            n_bc = len(emps_bc_dif)
+            n_total = n_fc + n_bc
 
             st.markdown("---")
-            st.markdown(f"### 📈 Aplicar aumento del convenio (+{pct:.2f}%) a Fuera de Convenio")
-            st.info(f"El nuevo convenio implica un aumento del **+{pct:.2f}%**. Hay **{n_fc}** empleados Fuera de Convenio activos.")
-            st.markdown("Este aumento se aplicará al **Sueldo Básico** y a la **Diferencia de Sueldo** de cada uno.")
+            st.markdown(f"### 📈 Aplicar aumento del convenio (+{pct:.2f}%)")
+            st.info(f"El nuevo convenio implica un aumento del **+{pct:.2f}%**.\n"
+                    f"- **{n_fc}** empleados Fuera de Convenio (Básico + Dif. Sueldo)\n"
+                    f"- **{n_bc}** empleados Bajo Convenio con Dif. Sueldo (solo Dif. Sueldo)")
 
             col_si, col_no = st.columns(2)
             with col_si:
-                if st.button(f"✅ SÍ — Aplicar +{pct:.2f}% a {n_fc} Fuera de Convenio", type="primary", use_container_width=True, key="btn_si_aumento_fc"):
+                if st.button(f"✅ SÍ — Aplicar +{pct:.2f}% a {n_total} empleados", type="primary", use_container_width=True, key="btn_si_aumento_fc"):
                     db.aplicar_aumento_masivo_fc(pct, None)
                     del st.session_state['pct_aumento_pendiente']
-                    st.session_state.mensaje_exito = f"✅ Se aplicó un aumento del {pct:.2f}% a {n_fc} empleados Fuera de Convenio y sus Diferencias de Sueldo."
+                    st.session_state.mensaje_exito = f"✅ Aumento del {pct:.2f}% aplicado a {n_total} empleados ({n_fc} FC + {n_bc} Bajo Convenio con Dif.)."
                     st.rerun()
             with col_no:
                 if st.button("❌ NO — No aplicar aumento", use_container_width=True, key="btn_no_aumento_fc"):

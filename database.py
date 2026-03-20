@@ -536,19 +536,23 @@ def actualizar_empleado(emp_id, data):
 
 def aplicar_aumento_masivo_fc(porcentaje, seccion=None):
     """
-    Aplica un aumento porcentual a sueldo_base y diferencia_sueldo
-    para todos los empleados fuera de convenio activos.
+    Aplica un aumento porcentual a:
+    - sueldo_base y diferencia_sueldo para empleados FUERA DE CONVENIO
+    - diferencia_sueldo para empleados BAJO CONVENIO que tengan dif > 0
     Guarda snapshot previo para poder retrotraer.
     """
     import json
     conn = get_connection()
     c = conn.cursor()
 
-    # Obtener empleados afectados ANTES del cambio (snapshot)
+    # Obtener TODOS los empleados afectados ANTES del cambio (snapshot)
+    # FC: se les toca sueldo_base + diferencia_sueldo
+    # Bajo Convenio con dif > 0: solo diferencia_sueldo
     q_select = """
-        SELECT id, apellido_nombre, sueldo_base, diferencia_sueldo
+        SELECT id, apellido_nombre, sueldo_base, diferencia_sueldo, fuera_convenio
         FROM empleados
-        WHERE fuera_convenio = 1 AND estado = 'ACTIVO'
+        WHERE estado = 'ACTIVO'
+          AND (fuera_convenio = 1 OR (fuera_convenio = 0 AND diferencia_sueldo > 0))
     """
     params_sel = []
     if seccion:
@@ -560,7 +564,8 @@ def aplicar_aumento_masivo_fc(porcentaje, seccion=None):
     # Guardar detalle como JSON
     detalle = json.dumps([
         {"id": e["id"], "nombre": e["apellido_nombre"],
-         "sueldo_base": e["sueldo_base"], "diferencia_sueldo": e["diferencia_sueldo"]}
+         "sueldo_base": e["sueldo_base"], "diferencia_sueldo": e["diferencia_sueldo"],
+         "fuera_convenio": e["fuera_convenio"]}
         for e in empleados_antes
     ])
 
@@ -570,23 +575,35 @@ def aplicar_aumento_masivo_fc(porcentaje, seccion=None):
         VALUES (?, ?, ?, ?)
     """, [porcentaje, seccion, len(empleados_antes), detalle])
 
-    # Factor multiplicador (ej: 1.10 para 10% de aumento)
     factor = 1 + (porcentaje / 100.0)
 
-    query = """
+    # 1) Fuera de Convenio: sueldo_base + diferencia_sueldo
+    q_fc = """
         UPDATE empleados
         SET sueldo_base = sueldo_base * ?,
             diferencia_sueldo = diferencia_sueldo * ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE fuera_convenio = 1 AND estado = 'ACTIVO'
     """
-    params = [factor, factor]
-
+    p_fc = [factor, factor]
     if seccion:
-        query += " AND seccion = ?"
-        params.append(seccion)
+        q_fc += " AND seccion = ?"
+        p_fc.append(seccion)
+    c.execute(q_fc, p_fc)
 
-    c.execute(query, params)
+    # 2) Bajo Convenio con diferencia_sueldo > 0: solo diferencia_sueldo
+    q_bc = """
+        UPDATE empleados
+        SET diferencia_sueldo = diferencia_sueldo * ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE fuera_convenio = 0 AND diferencia_sueldo > 0 AND estado = 'ACTIVO'
+    """
+    p_bc = [factor]
+    if seccion:
+        q_bc += " AND seccion = ?"
+        p_bc.append(seccion)
+    c.execute(q_bc, p_bc)
+
     conn.commit()
     conn.close()
 
