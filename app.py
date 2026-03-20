@@ -1067,7 +1067,38 @@ with tab_admin:
                             st.rerun()
                 else:
                     st.info("No hay empleados Fuera de Convenio activos para el sector seleccionado.")
-            
+
+                # --- Retrotraer último aumento ---
+                st.divider()
+                ultimo = db.get_ultimo_aumento_fc()
+                if ultimo:
+                    st.markdown(f"**Último aumento aplicado:** {ultimo['porcentaje']}% — "
+                                f"{ultimo['cantidad_empleados']} empleados — "
+                                f"{ultimo['fecha'][:16].replace('T',' ')}"
+                                f"{' — Sector: ' + ultimo['seccion'] if ultimo['seccion'] else ''}")
+                    import json
+                    detalle_prev = json.loads(ultimo['detalle'])
+                    factor_prev = 1 + (ultimo['porcentaje'] / 100.0)
+                    preview_retro = []
+                    for ep in detalle_prev:
+                        preview_retro.append({
+                            'Nombre': ep['nombre'],
+                            'Básico Actual': ep['sueldo_base'] * factor_prev,
+                            'Básico Original': ep['sueldo_base'],
+                            'Dif. Actual': ep['diferencia_sueldo'] * factor_prev,
+                            'Dif. Original': ep['diferencia_sueldo']
+                        })
+                    with st.expander("👁️ Ver detalle de valores a restaurar"):
+                        st.dataframe(_fmt_df(pd.DataFrame(preview_retro)), use_container_width=True, hide_index=True)
+
+                    conf_retro = st.checkbox("Confirmo que deseo retrotraer este aumento", key="conf_retro_fc")
+                    if st.button("↩️ Retrotraer Último Aumento", type="secondary", use_container_width=True, disabled=not conf_retro):
+                        n = db.retrotraer_aumento_fc(ultimo['id'])
+                        st.success(f"✅ Se restauraron los valores originales de {n} empleados.")
+                        st.rerun()
+                else:
+                    st.caption("No hay aumentos recientes para retrotraer.")
+
             # Exportar listado de personal
             st.markdown("#### ⬇️ Exportar Personal")
             c_e1, c_e2 = st.columns(2)

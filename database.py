@@ -262,6 +262,19 @@ def init_db():
         except sqlite3.OperationalError:
             pass
 
+    # ── Historial de aumentos masivos FC (para retrotraer) ──
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS historial_aumentos_fc (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            porcentaje REAL NOT NULL,
+            seccion TEXT,
+            cantidad_empleados INTEGER NOT NULL,
+            detalle TEXT NOT NULL,
+            revertido INTEGER DEFAULT 0
+        )
+    """)
+
     # ── Tabla de cuentas contables del asiento ──
     c.execute("""
         CREATE TABLE IF NOT EXISTS cuentas_asiento (
@@ -523,31 +536,101 @@ def actualizar_empleado(emp_id, data):
 
 def aplicar_aumento_masivo_fc(porcentaje, seccion=None):
     """
-    Aplica un aumento porcentual a sueldo_base y diferencia_sueldo 
+    Aplica un aumento porcentual a sueldo_base y diferencia_sueldo
     para todos los empleados fuera de convenio activos.
+    Guarda snapshot previo para poder retrotraer.
     """
+    import json
     conn = get_connection()
     c = conn.cursor()
-    
+
+    # Obtener empleados afectados ANTES del cambio (snapshot)
+    q_select = """
+        SELECT id, apellido_nombre, sueldo_base, diferencia_sueldo
+        FROM empleados
+        WHERE fuera_convenio = 1 AND estado = 'ACTIVO'
+    """
+    params_sel = []
+    if seccion:
+        q_select += " AND seccion = ?"
+        params_sel.append(seccion)
+
+    empleados_antes = c.execute(q_select, params_sel).fetchall()
+
+    # Guardar detalle como JSON
+    detalle = json.dumps([
+        {"id": e["id"], "nombre": e["apellido_nombre"],
+         "sueldo_base": e["sueldo_base"], "diferencia_sueldo": e["diferencia_sueldo"]}
+        for e in empleados_antes
+    ])
+
+    # Registrar en historial
+    c.execute("""
+        INSERT INTO historial_aumentos_fc (porcentaje, seccion, cantidad_empleados, detalle)
+        VALUES (?, ?, ?, ?)
+    """, [porcentaje, seccion, len(empleados_antes), detalle])
+
     # Factor multiplicador (ej: 1.10 para 10% de aumento)
     factor = 1 + (porcentaje / 100.0)
-    
+
     query = """
-        UPDATE empleados 
+        UPDATE empleados
         SET sueldo_base = sueldo_base * ?,
             diferencia_sueldo = diferencia_sueldo * ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE fuera_convenio = 1 AND estado = 'ACTIVO'
     """
     params = [factor, factor]
-    
+
     if seccion:
         query += " AND seccion = ?"
         params.append(seccion)
-        
+
     c.execute(query, params)
     conn.commit()
     conn.close()
+
+
+def get_ultimo_aumento_fc():
+    """Obtiene el último aumento masivo FC no revertido."""
+    conn = get_connection()
+    row = conn.execute("""
+        SELECT * FROM historial_aumentos_fc
+        WHERE revertido = 0
+        ORDER BY id DESC LIMIT 1
+    """).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def retrotraer_aumento_fc(aumento_id):
+    """
+    Retrotrrae el aumento indicado restaurando los valores originales
+    de sueldo_base y diferencia_sueldo desde el snapshot guardado.
+    """
+    import json
+    conn = get_connection()
+    c = conn.cursor()
+
+    row = c.execute("SELECT * FROM historial_aumentos_fc WHERE id = ? AND revertido = 0", [aumento_id]).fetchone()
+    if not row:
+        conn.close()
+        return 0
+
+    detalle = json.loads(row["detalle"])
+    count = 0
+    for emp in detalle:
+        c.execute("""
+            UPDATE empleados
+            SET sueldo_base = ?, diferencia_sueldo = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, [emp["sueldo_base"], emp["diferencia_sueldo"], emp["id"]])
+        count += 1
+
+    c.execute("UPDATE historial_aumentos_fc SET revertido = 1 WHERE id = ?", [aumento_id])
+    conn.commit()
+    conn.close()
+    return count
 
 def eliminar_empleados_inactivos():
     """
