@@ -616,8 +616,15 @@ with tab_admin:
                 opciones_nombres = ["--- Seleccione un empleado ---"] + [f"{e['id']} - {e['apellido_nombre']}" for e in emp_filtrados]
                 opciones_dict = {f"{e['id']} - {e['apellido_nombre']}": e['id'] for e in emp_filtrados}
                 
-                sel = st.selectbox("Seleccionar empleado", opciones_nombres, key=f"sel_emp_edit_{st.session_state.sel_emp_key_cnt}")
-                
+                col_sel, col_limpiar = st.columns([5, 1])
+                with col_sel:
+                    sel = st.selectbox("Seleccionar empleado", opciones_nombres, key=f"sel_emp_edit_{st.session_state.sel_emp_key_cnt}")
+                with col_limpiar:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("🗑️", key="btn_limpiar_sel_emp", help="Limpiar selección"):
+                        st.session_state.sel_emp_key_cnt += 1
+                        st.rerun()
+
                 if 'msg_edit_emp' in st.session_state:
                     st.success(st.session_state.msg_edit_emp)
                     del st.session_state.msg_edit_emp
@@ -1143,14 +1150,25 @@ with tab_admin:
                         st.dataframe(_fmt_df(pd.DataFrame(preview_bc)), use_container_width=True, hide_index=True)
 
                     st.markdown(f"**Total empleados afectados: {total_afectados}**")
-                    st.warning("⚠️ Al presionar el botón se modificarán permanentemente los valores en la base de datos.")
-                    if st.button("🚀 Aplicar Aumento Masivo", type="primary", use_container_width=True):
-                        if pct_inc <= 0:
-                            st.error("El porcentaje debe ser mayor a cero.")
-                        else:
-                            db.aplicar_aumento_masivo_fc(pct_inc, sector_filter)
-                            st.success(f"✅ Aumento del {pct_inc}% aplicado a {total_afectados} empleados ({len(emps_fc)} FC + {len(emps_bc_dif)} Bajo Convenio con Dif.).")
-                            st.rerun()
+
+                    # Verificar si ya hay un aumento pendiente sin revertir
+                    ultimo_aumento = db.get_ultimo_aumento_fc()
+                    ya_aplicado = ultimo_aumento and not ultimo_aumento.get('revertido', 0)
+
+                    if ya_aplicado:
+                        st.success(f"✅ Ya hay un aumento vigente del **{ultimo_aumento['porcentaje']}%** aplicado el {ultimo_aumento['fecha'][:16]}. "
+                                   f"Si querés aplicar otro, primero retrotraé el anterior.")
+                    else:
+                        st.warning("⚠️ Al presionar el botón se modificarán permanentemente los valores en la base de datos.")
+                        confirmar = st.checkbox("Confirmo que deseo aplicar este aumento", key="conf_aumento_masivo")
+                        if confirmar:
+                            if st.button("🚀 Aplicar Aumento Masivo", type="primary", use_container_width=True):
+                                if pct_inc <= 0:
+                                    st.error("El porcentaje debe ser mayor a cero.")
+                                else:
+                                    db.aplicar_aumento_masivo_fc(pct_inc, sector_filter)
+                                    st.session_state.mensaje_exito = f"✅ Aumento del {pct_inc}% aplicado exitosamente a {total_afectados} empleados. Los valores ya están actualizados en cada legajo."
+                                    st.rerun()
                 else:
                     st.info("No hay empleados afectados para el sector seleccionado.")
 
@@ -1255,13 +1273,27 @@ with tab_admin:
                     if es_pdf:
                         # ── Parsear PDF con pdfplumber ──
                         st.info("📄 Archivo PDF detectado. Extrayendo tablas...")
-                        df_conv = import_data.extraer_tabla_convenio_pdf(uploaded_conv.read())
+                        pdf_bytes = uploaded_conv.read()
+                        # Guardar copia para debug
+                        try:
+                            with open(os.path.join("data", "ultimo_convenio.pdf"), "wb") as _f:
+                                _f.write(pdf_bytes)
+                        except:
+                            pass
+                        df_conv = import_data.extraer_tabla_convenio_pdf(pdf_bytes)
                         if df_conv is None or df_conv.empty:
                             st.error("⚠️ No se pudieron extraer tablas del PDF. Verificá que el archivo contenga tablas con datos de convenio.")
                             df_conv = None
                         else:
                             st.success(f"✅ PDF cargado: **{uploaded_conv.name}** — {len(df_conv)} filas extraídas")
-                            st.dataframe(df_conv.head(20), use_container_width=True)
+                            # Mostrar solo filas del mes activo como preview
+                            if 'Mes' in df_conv.columns:
+                                df_preview = df_conv[df_conv['Mes'] == m]
+                                if df_preview.empty:
+                                    df_preview = df_conv.head(20)
+                                st.dataframe(df_preview, use_container_width=True, hide_index=True)
+                            else:
+                                st.dataframe(df_conv.head(20), use_container_width=True)
                             # Para PDFs: si no hay columna Mes, pedir al usuario el mes a asignar
                             if 'Mes' in df_conv.columns and df_conv['Mes'].notna().any():
                                 pass  # Ya tiene mes
@@ -1736,7 +1768,14 @@ with tab_liq:
         with col_p2:
             st.info(f"💡 Hay {len(liq_del_periodo)} liquidaciones guardadas en este período.")
 
-    sel_emp = st.selectbox("Seleccionar empleado", opciones_nombres, key=f"sel_emp_liq_{st.session_state.liq_emp_key_cnt}")
+    col_sel_liq, col_limp_liq = st.columns([5, 1])
+    with col_sel_liq:
+        sel_emp = st.selectbox("Seleccionar empleado", opciones_nombres, key=f"sel_emp_liq_{st.session_state.liq_emp_key_cnt}")
+    with col_limp_liq:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗑️", key="btn_limpiar_sel_liq", help="Limpiar selección"):
+            st.session_state.liq_emp_key_cnt += 1
+            st.rerun()
 
     if sel_emp and sel_emp != "--- Seleccione un empleado ---":
         emp = opciones_emp[sel_emp]

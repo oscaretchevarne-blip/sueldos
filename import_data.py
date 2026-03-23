@@ -365,82 +365,190 @@ def aplicar_aumento_fuera_convenio(mes_nuevo, anio_nuevo):
 
 def extraer_tabla_convenio_pdf(file_bytes):
     """
-    Extrae una tabla de valores de convenio desde un PDF usando pdfplumber.
-    Retorna un DataFrame con columnas estandarizadas, o None si no pudo extraer datos.
-    
-    Busca tablas con datos numéricos que parecen valores de hora/mensual.
+    Extrae tabla de valores de convenio desde un PDF tipo UOYEP/CAIP.
+    Formato esperado: meses como columnas, categorías como filas.
+    Cada mes tiene sub-columnas "Valor Hora" y opcionalmente "Suma Fija No Remunerativa".
+    Retorna DataFrame con columnas: Mes, Anio, Categoria, ValorHora, ValorMensual.
     """
     try:
         import pdfplumber
         import io
+        import re
 
-        filas = []
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-            for page in pdf.pages:
-                tablas = page.extract_tables()
-                for tabla in tablas:
-                    if not tabla or len(tabla) < 2:
-                        continue
-                    # Primera fila como encabezado   
-                    headers = [str(h).strip().lower() if h else '' for h in tabla[0]]
-                    for row in tabla[1:]:
-                        if len(row) < 2:
-                            continue
-                        fila_dict = {}
-                        for i, val in enumerate(row):
-                            if i < len(headers):
-                                fila_dict[headers[i]] = val
-                        filas.append(fila_dict)
-        
-        if not filas:
-            return None
-        
-        df_raw = pd.DataFrame(filas)
-        
-        # Intentar normalizar a columnas estándar
         def _limpia_num(v):
-            """Convierte formato argentino '1.234.567,89' a float."""
-            if v is None or str(v).strip() in ('', '-', 'None'):
+            if v is None or str(v).strip() in ('', '-', 'None', 'nan'):
                 return 0.0
-            s = str(v).strip()
-            # Quitar puntos de miles, reemplazar coma decimal
-            s = s.replace('.', '').replace(',', '.')
+            s = str(v).strip().replace(' ', '')
+            # Detectar formato: si tiene punto Y coma, determinar cuál es decimal
+            if ',' in s and '.' in s:
+                if s.rfind('.') > s.rfind(','):
+                    # Formato anglosajón: 5,643.34
+                    s = s.replace(',', '')
+                else:
+                    # Formato argentino: 5.643,34
+                    s = s.replace('.', '').replace(',', '.')
+            elif ',' in s:
+                # Solo coma: 5756,21 (decimal) o 5,643 (miles)
+                parts = s.split(',')
+                if len(parts[-1]) == 2:
+                    s = s.replace(',', '.')  # Es decimal
+                else:
+                    s = s.replace(',', '')  # Es miles
+            elif s.count('.') >= 2:
+                # Múltiples puntos sin coma: 1.151.540 = puntos son miles
+                s = s.replace('.', '')
+            elif '.' in s:
+                # Un solo punto: podría ser decimal (65.00) o miles (65.000)
+                parts = s.split('.')
+                if len(parts[-1]) == 3 and len(parts[0]) <= 3:
+                    # Patrón 65.000 = 65000 (punto de miles)
+                    s = s.replace('.', '')
+                # else: es decimal, dejarlo
             try:
                 return float(s)
             except ValueError:
                 return 0.0
-        
-        # Detectar columna de categoría
-        col_cat_raw = next((c for c in df_raw.columns if any(k in c for k in ['categ', 'descrip', 'nombre', 'cargo'])), None)
-        # Detectar columna de valor hora y mensual
-        col_vh_raw = next((c for c in df_raw.columns if 'hora' in c), None)
-        col_vm_raw = next((c for c in df_raw.columns if 'mensual' in c or 'sueldo' in c or 'basico' in c), None)
-        # Detectar columnas de mes y año
-        col_mes_raw = next((c for c in df_raw.columns if c in ('mes', 'mes vigencia')), None)
-        col_anio_raw = next((c for c in df_raw.columns if c in ('año', 'anio', 'año vigencia')), None)
-        
-        if not col_cat_raw:
-            # Sin columna de categoría identificable, retornar raw para que el usuario vea
-            return df_raw
-        
-        # Construir DataFrame limpio
-        rows_limpias = []
-        for _, r in df_raw.iterrows():
-            cat = str(r.get(col_cat_raw, '')).strip()
-            if not cat or cat.lower() in ('none', 'nan', ''):
-                continue
-            rows_limpias.append({
-                'Mes': int(_limpia_num(r.get(col_mes_raw))) if col_mes_raw else None,
-                'Anio': int(_limpia_num(r.get(col_anio_raw))) if col_anio_raw else None,
-                'Categoria': cat,
-                'ValorHora': _limpia_num(r.get(col_vh_raw)) if col_vh_raw else 0.0,
-                'ValorMensual': _limpia_num(r.get(col_vm_raw)) if col_vm_raw else 0.0,
-            })
-        
-        if not rows_limpias:
-            return df_raw  # Retornar raw para inspección
-        
-        return pd.DataFrame(rows_limpias)
+
+        MESES_MAP = {
+            'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+            'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+            'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+        }
+
+        rows_out = []
+
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for page in pdf.pages:
+                tablas = page.extract_tables()
+                for tabla in tablas:
+                    if not tabla or len(tabla) < 4:
+                        continue
+
+                    # Buscar fila de meses
+                    fila_meses = None
+                    for idx, row in enumerate(tabla):
+                        row_str = ' '.join([str(c) for c in row if c]).lower()
+                        meses_encontrados = [m for m in MESES_MAP if m in row_str]
+                        if len(meses_encontrados) >= 2:
+                            fila_meses = idx
+                            break
+
+                    if fila_meses is None:
+                        continue
+
+                    # Parsear estructura de meses desde la fila de meses
+                    mes_row = tabla[fila_meses]
+                    col_mes_map = {}  # col_index -> (mes_num, año)
+                    for ci, cell in enumerate(mes_row):
+                        if not cell:
+                            continue
+                        cell_clean = str(cell).strip().lower().replace('\n', ' ')
+                        for mes_name, mes_num in MESES_MAP.items():
+                            if mes_name in cell_clean:
+                                # Extraer año: "2026", "2025", o abreviado "26.", "25."
+                                anio_match = re.search(r'20(\d{2})', cell_clean)
+                                if anio_match:
+                                    anio = int(anio_match.group())
+                                else:
+                                    # Buscar año abreviado: "26.", "25", etc.
+                                    anio_short = re.search(r'\b(\d{2})\b', cell_clean.replace(mes_name, ''))
+                                    if anio_short:
+                                        anio = 2000 + int(anio_short.group(1))
+                                    else:
+                                        anio = 2026
+                                col_mes_map[ci] = (mes_num, anio)
+                                break
+
+                    if not col_mes_map:
+                        continue
+
+                    # Buscar filas de sub-headers ("Valor Hora" / "Valor Mensual")
+                    # Puede haber múltiples secciones: Producción (Valor Hora) y Administrativas (Valor Mensual)
+                    # Recorrer todas las filas después de meses, detectar secciones
+                    tipo_valor = 'hora'  # default
+                    col_valor = {}  # mes_key -> col_index
+
+                    # Primera pasada: encontrar primera fila sub-header
+                    for idx in range(fila_meses + 1, len(tabla)):
+                        row_str = ' '.join([str(c) for c in tabla[idx] if c]).lower()
+                        if 'valor hora' in row_str or 'valor mensual' in row_str:
+                            sub_row = tabla[idx]
+                            for ci, cell in enumerate(sub_row):
+                                if not cell:
+                                    continue
+                                cell_low = str(cell).lower()
+                                if 'valor hora' in cell_low or 'valor mensual' in cell_low:
+                                    best_mes_ci = min(col_mes_map.keys(), key=lambda x, c=ci: abs(x - c))
+                                    mes_key = col_mes_map[best_mes_ci]
+                                    col_valor[mes_key] = ci
+                            break
+
+                    if not col_valor:
+                        for ci, mk in col_mes_map.items():
+                            col_valor[mk] = ci
+
+                    # Recorrer datos: detectar cambios de sección (Valor Hora <-> Valor Mensual)
+                    started = False
+                    for idx in range(fila_meses + 1, len(tabla)):
+                        row = tabla[idx]
+                        if not row or len(row) < 2:
+                            continue
+
+                        row_str = ' '.join([str(c) for c in row if c]).lower()
+
+                        # Detectar cambio de sección (sub-header con "Valor Mensual" o "Valor Hora")
+                        if 'valor mensual' in row_str:
+                            tipo_valor = 'mensual'
+                            # Re-mapear columnas para esta sección
+                            col_valor = {}
+                            for ci, cell in enumerate(row):
+                                if not cell:
+                                    continue
+                                if 'valor mensual' in str(cell).lower():
+                                    best_mes_ci = min(col_mes_map.keys(), key=lambda x, c=ci: abs(x - c))
+                                    mes_key = col_mes_map[best_mes_ci]
+                                    col_valor[mes_key] = ci
+                            continue
+                        if 'valor hora' in row_str and started:
+                            tipo_valor = 'hora'
+                            col_valor = {}
+                            for ci, cell in enumerate(row):
+                                if not cell:
+                                    continue
+                                if 'valor hora' in str(cell).lower():
+                                    best_mes_ci = min(col_mes_map.keys(), key=lambda x, c=ci: abs(x - c))
+                                    mes_key = col_mes_map[best_mes_ci]
+                                    col_valor[mes_key] = ci
+                            continue
+
+                        # Col 0 = categoría
+                        cat_raw = str(row[0] or '').strip()
+                        if not cat_raw or cat_raw.lower() in ('none', '', 'nan'):
+                            continue
+
+                        # Verificar si es header de sección (sin números)
+                        tiene_numeros = any(_limpia_num(c) > 0 for c in row[1:] if c)
+                        if not tiene_numeros:
+                            continue
+
+                        started = True
+                        # Extraer valores por mes
+                        for (mes_num, anio), col_idx in col_valor.items():
+                            if col_idx < len(row):
+                                valor = _limpia_num(row[col_idx])
+                                if valor > 0:
+                                    rows_out.append({
+                                        'Mes': mes_num,
+                                        'Anio': anio,
+                                        'Categoria': cat_raw.upper(),
+                                        'ValorHora': valor if tipo_valor == 'hora' else 0.0,
+                                        'ValorMensual': valor if tipo_valor == 'mensual' else 0.0,
+                                    })
+
+        if not rows_out:
+            return None
+
+        return pd.DataFrame(rows_out)
 
     except Exception as e:
         raise RuntimeError(f"Error al leer PDF: {e}")
