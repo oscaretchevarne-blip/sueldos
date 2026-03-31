@@ -40,9 +40,20 @@ st.set_page_config(
 
 # ════════════════════════════════════════════════════
 # AUTENTICACION
+# Fuentes de credenciales (en orden de prioridad):
+#   1. Streamlit Secrets (para Streamlit Cloud)
+#   2. Variables de entorno / .env (para entorno local)
+#   3. Fallback: admin/admin
 # ════════════════════════════════════════════════════
+def _get_credential(key, default="admin"):
+    """Busca credencial en st.secrets, luego env, luego default."""
+    try:
+        return st.secrets.get(key, os.environ.get(key, default))
+    except Exception:
+        return os.environ.get(key, default)
+
 USUARIOS = {
-    os.environ.get("SUELDOS_USER", "admin"): os.environ.get("SUELDOS_PASS", "admin"),
+    _get_credential("SUELDOS_USER"): _get_credential("SUELDOS_PASS"),
 }
 
 def login():

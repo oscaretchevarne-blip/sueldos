@@ -42,26 +42,36 @@ def load_env():
 # ──────────────────────────────────────────────
 
 LOG_DIR = os.path.join(BASE_DIR, "logs")
-os.makedirs(LOG_DIR, exist_ok=True)
 
-LOG_PATH = os.path.join(LOG_DIR, "sueldos.log")
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    LOG_PATH = os.path.join(LOG_DIR, "sueldos.log")
+    _LOG_FILE_OK = True
+except OSError:
+    LOG_PATH = None
+    _LOG_FILE_OK = False
 
 
 def get_logger(name="sueldos"):
-    """Obtiene un logger configurado con salida a archivo y consola."""
+    """Obtiene un logger configurado con salida a archivo y consola.
+    Si no se puede escribir archivo (ej: Streamlit Cloud), solo usa consola."""
     logger = logging.getLogger(name)
     if not logger.handlers:
         logger.setLevel(logging.INFO)
 
-        # Archivo rotativo
-        from logging.handlers import RotatingFileHandler
-        fh = RotatingFileHandler(LOG_PATH, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
-        fh.setLevel(logging.INFO)
-        fh.setFormatter(logging.Formatter(
-            '%(asctime)s | %(levelname)-7s | %(name)s | %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        ))
-        logger.addHandler(fh)
+        # Archivo rotativo (si el directorio es escribible)
+        if _LOG_FILE_OK and LOG_PATH:
+            try:
+                from logging.handlers import RotatingFileHandler
+                fh = RotatingFileHandler(LOG_PATH, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
+                fh.setLevel(logging.INFO)
+                fh.setFormatter(logging.Formatter(
+                    '%(asctime)s | %(levelname)-7s | %(name)s | %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S'
+                ))
+                logger.addHandler(fh)
+            except OSError:
+                pass  # No se puede escribir archivo, solo consola
 
         # Consola (solo errores para no ensuciar Streamlit)
         ch = logging.StreamHandler()
