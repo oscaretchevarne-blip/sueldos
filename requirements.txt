@@ -3,3 +3,4 @@ pandas
 fpdf2
 xlsxwriter
 openpyxl
+python-dotenv  # opcional: si no está, utils.py tiene fallback manual

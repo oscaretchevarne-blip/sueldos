@@ -5,3 +5,6 @@ _legacy/
 BACKUP_*/
 ~$*
 *.tmp
+.env
+logs/
+*.log

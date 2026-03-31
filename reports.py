@@ -8,6 +8,7 @@ from datetime import datetime
 from fpdf import FPDF
 import pandas as pd
 import database as db
+from utils import fmt_ar as _fmt_ar, ascii_safe as _ascii, acortar_nombre
 
 
 def _safe_pdf_output(pdf):
@@ -23,38 +24,6 @@ def _safe_pdf_output(pdf):
     if isinstance(raw, str):
         return raw.encode('latin-1')
     return bytes(raw)
-
-
-def _ascii(texto):
-    """Convierte texto a ASCII seguro para FPDF (evita UnicodeEncodeError)."""
-    if not texto:
-        return ''
-    replacements = {
-        '\u00e1': 'a', '\u00e9': 'e', '\u00ed': 'i', '\u00f3': 'o', '\u00fa': 'u',
-        '\u00c1': 'A', '\u00c9': 'E', '\u00cd': 'I', '\u00d3': 'O', '\u00da': 'U',
-        '\u00f1': 'n', '\u00d1': 'N', '\u00fc': 'u', '\u00dc': 'U',
-        '\u00b0': 'o', '\x9c': 'oe', '\xa0': ' ',
-        '\u2013': '-', '\u2014': '-', '\u2018': "'", '\u2019': "'",
-        '\u201c': '"', '\u201d': '"', '\u2026': '...', '\u20ac': 'EUR',
-    }
-    result = str(texto)
-    for k, v in replacements.items():
-        result = result.replace(k, v)
-    result = result.encode('latin-1', errors='replace').decode('latin-1')
-    return result
-
-
-def _fmt_ar(n, decimales=2):
-    """Formato argentino: punto para miles, coma para decimales.
-    Ej: 1234567.89 -> '1.234.567,89'
-    """
-    if n is None:
-        return '0,00' if decimales == 2 else '0'
-    fmt_us = f"{abs(n):,.{decimales}f}"
-    fmt_ar = fmt_us.replace(',', '@').replace('.', ',').replace('@', '.')
-    if n < 0:
-        return f"-{fmt_ar}"
-    return fmt_ar
 
 
 class ReciboPDF(FPDF):
@@ -340,22 +309,8 @@ def generar_listado_resumido(liquidaciones, empleados_dict):
     data = []
     for liq in liquidaciones:
         emp = empleados_dict.get(liq['empleado_id'], {})
-        # Acortar nombre: Apellido + primer nombre (Consistencia con listado detallado)
-        nombre_completo = emp.get('apellido_nombre', '').strip()
-        nombre_corto = nombre_completo
-        if ',' in nombre_completo:
-            partes = nombre_completo.split(',')
-            apellido = partes[0].strip()
-            resto = partes[1].strip().split(' ')[0]
-            nombre_corto = f"{apellido} {resto}"
-        elif ' ' in nombre_completo:
-            partes = nombre_completo.split(' ')
-            apellido = partes[0].strip()
-            nombre = partes[1].strip()
-            nombre_corto = f"{apellido} {nombre}"
-
         data.append({
-            'Empleado': nombre_corto[:20],
+            'Empleado': acortar_nombre(emp.get('apellido_nombre', '')),
             'Total Neto a Cobrar': liq.get('total_neto', 0)
         })
     df = pd.DataFrame(data)
@@ -368,22 +323,8 @@ def generar_listado_detallado(liquidaciones, empleados_dict):
     data = []
     for liq in liquidaciones:
         emp = empleados_dict.get(liq['empleado_id'], {})
-        # Acortar nombre: Apellido + primer nombre
-        nombre_completo = emp.get('apellido_nombre', '').strip()
-        nombre_corto = nombre_completo
-        if ',' in nombre_completo:
-            partes = nombre_completo.split(',')
-            apellido = partes[0].strip()
-            resto = partes[1].strip().split(' ')[0]
-            nombre_corto = f"{apellido} {resto}"
-        elif ' ' in nombre_completo:
-            partes = nombre_completo.split(' ')
-            apellido = partes[0].strip()
-            nombre = partes[1].strip()
-            nombre_corto = f"{apellido} {nombre}"
-
         row = {
-            'Empleado': nombre_corto[:20],
+            'Empleado': acortar_nombre(emp.get('apellido_nombre', '')),
             'C. 50%': liq.get('horas_extra_50', 0),
             'C. 100%': liq.get('horas_extra_100', 0),
             'Basico': liq.get('importe_basico_mensual', 0),

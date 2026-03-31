@@ -7,22 +7,16 @@ import pandas as pd
 import os
 import io
 from datetime import date, datetime
-
 import database as db
 import import_data
 import calculator
 import reports
+from utils import fmt_ar as _fmt_ar, get_logger, load_env
 
+# Cargar variables de entorno desde .env
+load_env()
 
-def _fmt_ar(n, decimales=2):
-    """Formato argentino: punto para miles, coma para decimales."""
-    if n is None:
-        return '0,00' if decimales == 2 else '0'
-    fmt_us = f"{abs(n):,.{decimales}f}"
-    fmt_ar = fmt_us.replace(',', '@').replace('.', ',').replace('@', '.')
-    if n < 0:
-        return f"-{fmt_ar}"
-    return fmt_ar
+logger = get_logger("app")
 
 
 def _fmt_df(df):
@@ -48,7 +42,7 @@ st.set_page_config(
 # AUTENTICACION
 # ════════════════════════════════════════════════════
 USUARIOS = {
-    "etcheoscar": "oscar2026",
+    os.environ.get("SUELDOS_USER", "admin"): os.environ.get("SUELDOS_PASS", "admin"),
 }
 
 def login():

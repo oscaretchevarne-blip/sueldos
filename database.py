@@ -6,16 +6,64 @@ import sqlite3
 import os
 import shutil
 from datetime import datetime
+from utils import get_logger
+
+logger = get_logger("database")
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sueldos.db")
 
+# Versión actual del esquema — incrementar cada vez que se agregue una migración
+SCHEMA_VERSION = 1
+
 
 def get_connection():
-    """Obtiene conexión a la base de datos."""
-    conn = sqlite3.connect(DB_PATH)
+    """Obtiene conexión a la base de datos con WAL mode y timeout robusto."""
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 10000")
     return conn
+
+
+def _get_schema_version(conn):
+    """Obtiene la versión actual del esquema de la DB."""
+    try:
+        row = conn.execute("SELECT valor FROM config WHERE clave = 'schema_version'").fetchone()
+        return int(row[0]) if row else 0
+    except sqlite3.OperationalError:
+        return 0
+
+
+def _set_schema_version(conn, version):
+    """Guarda la versión del esquema en la DB."""
+    conn.execute("INSERT OR REPLACE INTO config (clave, valor) VALUES ('schema_version', ?)", (str(version),))
+
+
+def _run_one_time_data_migrations(cursor):
+    """
+    Ejecuta migraciones de datos que solo deben correr una vez.
+    Controlado por schema_version para no repetirse en cada inicio.
+    """
+    conn = cursor.connection
+    current_version = _get_schema_version(conn)
+
+    if current_version < 1:
+        # v1: Población de códigos contables para empleados específicos
+        _data_migrations_v1 = [
+            ("UPDATE empleados SET codigo_contable = '1.1.070.10.005', seccion_debito_externo = 'COMERCIALIZACION' "
+             "WHERE apellido_nombre LIKE '%MARIETTA%MARCELO%' AND (codigo_contable IS NULL OR codigo_contable = '')"),
+            ("UPDATE empleados SET codigo_contable = '1.1.070.10.006', seccion_debito_externo = 'FABRICA' "
+             "WHERE apellido_nombre LIKE '%ASAD%HORACIO%' AND (codigo_contable IS NULL OR codigo_contable = '')"),
+            ("UPDATE empleados SET codigo_contable = '1.1.070.10.007', seccion_debito_externo = '' "
+             "WHERE apellido_nombre LIKE '%FERNANDEZ%IRENE%' AND (codigo_contable IS NULL OR codigo_contable = '')"),
+            ("UPDATE empleados SET codigo_contable = '1.1.070.10.008', seccion_debito_externo = '' "
+             "WHERE apellido_nombre LIKE '%ZAPPALA%DELIA%' AND (codigo_contable IS NULL OR codigo_contable = '')"),
+        ]
+        for sql in _data_migrations_v1:
+            cursor.execute(sql)
+        _set_schema_version(conn, 1)
+        logger.info("Migración de datos v1 completada (códigos contables iniciales)")
 
 
 def init_db():
@@ -178,67 +226,37 @@ def init_db():
     """)
 
     # ── Migraciones (agregar columnas nuevas si no existen) ──
-    try:
-        c.execute("ALTER TABLE empleados ADD COLUMN liquida_presentismo INTEGER DEFAULT 1")
-    except sqlite3.OperationalError:
-        pass  # La columna ya existe
+    # Se usa _safe_add_column para evitar errores si la columna ya existe.
+    # Cada columna se registra aquí para bases de datos creadas antes de que
+    # la columna existiera en el CREATE TABLE inicial.
+    def _safe_add_column(table, column, col_type):
+        try:
+            c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+            logger.info(f"Migración: columna {table}.{column} agregada")
+        except sqlite3.OperationalError:
+            pass  # La columna ya existe
 
-    try:
-        c.execute("ALTER TABLE liquidaciones ADD COLUMN dias_trabajados REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass  # La columna ya existe
+    _safe_add_column("empleados", "liquida_presentismo", "INTEGER DEFAULT 1")
+    _safe_add_column("liquidaciones", "dias_trabajados", "REAL DEFAULT 0")
+    _safe_add_column("empleados", "fuera_convenio", "INTEGER DEFAULT 0")
+    _safe_add_column("liquidaciones", "dias_vacaciones", "REAL DEFAULT 0")
 
-    try:
-        c.execute("ALTER TABLE empleados ADD COLUMN fuera_convenio INTEGER DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
+    _safe_add_column("liquidaciones", "importe_vacaciones", "REAL DEFAULT 0")
+    _safe_add_column("empleados", "sueldo_base", "REAL DEFAULT 0")
+    _safe_add_column("empleados", "hs_fijas", "REAL DEFAULT 0")
+    _safe_add_column("liquidaciones", "remplazo_encargado", "REAL DEFAULT 0")
+    _safe_add_column("empleados", "condicion", "TEXT NOT NULL DEFAULT 'PERMANENTE'")
 
-    try:
-        c.execute("ALTER TABLE liquidaciones ADD COLUMN dias_vacaciones REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        c.execute("ALTER TABLE liquidaciones ADD COLUMN importe_vacaciones REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        c.execute("ALTER TABLE empleados ADD COLUMN sueldo_base REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        c.execute("ALTER TABLE empleados ADD COLUMN hs_fijas REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        c.execute("ALTER TABLE liquidaciones ADD COLUMN remplazo_encargado REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        c.execute("ALTER TABLE empleados ADD COLUMN condicion TEXT NOT NULL DEFAULT 'PERMANENTE'")
-    except sqlite3.OperationalError:
-        pass
-
+    # Migración de datos: eventuales que estaban como tipo='EVENTUAL' pasan a condicion='EVENTUAL'
     try:
         c.execute("UPDATE empleados SET condicion = 'EVENTUAL', tipo = 'JORNAL' WHERE tipo = 'EVENTUAL'")
-    except:
-        pass
-
-    try:
-        c.execute("ALTER TABLE empleados ADD COLUMN descuento_premio_prod REAL DEFAULT 0")
     except sqlite3.OperationalError:
         pass
 
-    try:
-        c.execute("ALTER TABLE empleados ADD COLUMN cobra_cifra_fija INTEGER DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
+    _safe_add_column("empleados", "descuento_premio_prod", "REAL DEFAULT 0")
+    _safe_add_column("empleados", "cobra_cifra_fija", "INTEGER DEFAULT 0")
 
-    # Nuevas columnas para anticipos y otros
+    # Columnas adicionales para anticipos, contabilidad, etc.
     columnas_nuevas = [
         ("empleados", "anticipos", "REAL DEFAULT 0"),
         ("empleados", "otros", "REAL DEFAULT 0"),
@@ -257,10 +275,7 @@ def init_db():
         ("empleados", "seccion_debito_externo", "TEXT DEFAULT ''"),
     ]
     for tab, col, typ in columnas_nuevas:
-        try:
-            c.execute(f"ALTER TABLE {tab} ADD COLUMN {col} {typ}")
-        except sqlite3.OperationalError:
-            pass
+        _safe_add_column(tab, col, typ)
 
     # ── Historial de aumentos masivos FC (para retrotraer) ──
     c.execute("""
@@ -312,36 +327,11 @@ def init_db():
             "INSERT OR IGNORE INTO cuentas_asiento (clave, codigo, nombre, tipo) VALUES (?, ?, ?, ?)",
             cuentas_default
         )
+        logger.info("Cuentas contables por defecto cargadas")
 
-    # ── Población automática de códigos para empleados específicos ──
-    # Marietta
-    c.execute("""
-        UPDATE empleados SET 
-            codigo_contable = '1.1.070.10.005', 
-            seccion_debito_externo = 'COMERCIALIZACION' 
-        WHERE apellido_nombre LIKE '%MARIETTA%MARCELO%'
-    """)
-    # Asad
-    c.execute("""
-        UPDATE empleados SET 
-            codigo_contable = '1.1.070.10.006', 
-            seccion_debito_externo = 'FABRICA' 
-        WHERE apellido_nombre LIKE '%ASAD%HORACIO%'
-    """)
-    # Fernandez Irene
-    c.execute("""
-        UPDATE empleados SET 
-            codigo_contable = '1.1.070.10.007',
-            seccion_debito_externo = ''
-        WHERE apellido_nombre LIKE '%FERNANDEZ%IRENE%'
-    """)
-    # Zappala Delia
-    c.execute("""
-        UPDATE empleados SET 
-            codigo_contable = '1.1.070.10.008',
-            seccion_debito_externo = ''
-        WHERE apellido_nombre LIKE '%ZAPPALA%DELIA%'
-    """)
+    # ── Población de códigos contables para empleados específicos ──
+    # Solo se ejecuta una vez (migración v1), controlado por schema_version
+    _run_one_time_data_migrations(c)
 
     # ──────────────────────────────────────────────
     # CONFIGURACIÓN (período activo, etc.)
@@ -355,6 +345,7 @@ def init_db():
 
     conn.commit()
     conn.close()
+    logger.info("Base de datos inicializada correctamente")
 
 
 # ──────────────────────────────────────────────────
@@ -542,6 +533,7 @@ def aplicar_aumento_masivo_fc(porcentaje, seccion=None):
     Guarda snapshot previo para poder retrotraer.
     """
     import json
+    logger.info(f"Iniciando aumento masivo FC: {porcentaje}% - Sección: {seccion or 'Todas'}")
     conn = get_connection()
     c = conn.cursor()
 
@@ -606,6 +598,7 @@ def aplicar_aumento_masivo_fc(porcentaje, seccion=None):
 
     conn.commit()
     conn.close()
+    logger.info(f"Aumento masivo FC aplicado: {porcentaje}% a {len(empleados_antes)} empleados")
 
 
 def get_ultimo_aumento_fc():
@@ -626,6 +619,7 @@ def retrotraer_aumento_fc(aumento_id):
     de sueldo_base y diferencia_sueldo desde el snapshot guardado.
     """
     import json
+    logger.info(f"Retrotraendo aumento FC ID={aumento_id}")
     conn = get_connection()
     c = conn.cursor()
 
@@ -862,35 +856,64 @@ def crear_periodo(quincena, mes, anio):
 
 
 def cerrar_periodo(periodo_id):
-    """Cierra un período (irreversible)."""
+    """Cierra un período (irreversible). Usa transacción para garantizar atomicidad."""
     conn = get_connection()
-    conn.execute("""
-        UPDATE periodos SET estado = 'CERRADO', fecha_cierre = CURRENT_TIMESTAMP
-        WHERE id = ? AND estado = 'ABIERTO'
-    """, (periodo_id,))
-    
-    # RESETEAR ANTICIPOS Y ACREDITACION BANCO A 0 AL CERRAR (Administración de Personal)
-    conn.execute("UPDATE empleados SET anticipos = 0, acreditacion_banco = 0, descuento_premio_prod = 0")
-    
-    # Resetear días de liquidación mensual si no son permanentes
-    conn.execute("UPDATE empleados SET dias_liquidacion_mensual = 30 WHERE dias_mensuales_permanente = 0")
-    
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("""
+            UPDATE periodos SET estado = 'CERRADO', fecha_cierre = CURRENT_TIMESTAMP
+            WHERE id = ? AND estado = 'ABIERTO'
+        """, (periodo_id,))
+
+        # RESETEAR ANTICIPOS Y ACREDITACION BANCO A 0 AL CERRAR (Administración de Personal)
+        conn.execute("UPDATE empleados SET anticipos = 0, acreditacion_banco = 0, descuento_premio_prod = 0")
+
+        # Resetear días de liquidación mensual si no son permanentes
+        conn.execute("UPDATE empleados SET dias_liquidacion_mensual = 30 WHERE dias_mensuales_permanente = 0")
+
+        conn.commit()
+        logger.info(f"Período ID={periodo_id} cerrado exitosamente")
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error cerrando período ID={periodo_id}: {e}")
+        raise
+    finally:
+        conn.close()
 
 
 def respaldar_db(periodo_tag=""):
-    """Crea una copia de seguridad de la base de datos."""
+    """Crea una copia de seguridad de la base de datos con validación de integridad."""
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BACKUPS_CIERRE")
     if not os.path.exists(backup_dir):
         os.makedirs(backup_dir)
-    
+
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     tag = f"_{periodo_tag.replace('/', '-')}" if periodo_tag else ""
     backup_filename = f"sueldos_respaldo_{timestamp}{tag}.db"
     backup_path = os.path.join(backup_dir, backup_filename)
-    
+
+    # Forzar checkpoint de WAL antes de copiar para asegurar datos completos
+    try:
+        conn = get_connection()
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.close()
+    except sqlite3.OperationalError as e:
+        logger.warning(f"No se pudo hacer checkpoint WAL antes del backup: {e}")
+
     shutil.copy2(DB_PATH, backup_path)
+
+    # Validar integridad del backup
+    try:
+        conn_backup = sqlite3.connect(backup_path)
+        result = conn_backup.execute("PRAGMA integrity_check").fetchone()
+        conn_backup.close()
+        if result[0] != 'ok':
+            logger.error(f"Backup CORRUPTO detectado: {backup_path} - {result[0]}")
+            raise RuntimeError(f"El backup falló la verificación de integridad: {result[0]}")
+        logger.info(f"Backup creado y verificado: {backup_path}")
+    except sqlite3.Error as e:
+        logger.error(f"Error verificando integridad del backup: {e}")
+        raise
+
     return backup_path
 
 
