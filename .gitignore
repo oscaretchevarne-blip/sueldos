@@ -6,5 +6,6 @@ BACKUP_*/
 ~$*
 *.tmp
 .env
+.streamlit/secrets.toml
 logs/
 *.log

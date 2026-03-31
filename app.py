@@ -47,13 +47,22 @@ st.set_page_config(
 # ════════════════════════════════════════════════════
 def _get_credential(key, default="admin"):
     """Busca credencial en st.secrets, luego env, luego default."""
+    # 1. Streamlit Secrets (Streamlit Cloud)
     try:
-        return st.secrets.get(key, os.environ.get(key, default))
-    except Exception:
-        return os.environ.get(key, default)
+        val = st.secrets[key]
+        if val:
+            return val
+    except (KeyError, FileNotFoundError, Exception):
+        pass
+    # 2. Variable de entorno / .env
+    val = os.environ.get(key)
+    if val:
+        return val
+    # 3. Fallback
+    return default
 
 USUARIOS = {
-    _get_credential("SUELDOS_USER"): _get_credential("SUELDOS_PASS"),
+    _get_credential("SUELDOS_USER", "etcheoscar"): _get_credential("SUELDOS_PASS", "oscar2026"),
 }
 
 def login():
