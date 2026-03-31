@@ -614,6 +614,8 @@ def procesar_excel_novedades(file_path):
     nombre_to_id = {_norm_nombre(e['apellido_nombre']): e['id'] for e in empleados_db if e.get('apellido_nombre')}
     db_words = {e['id']: _get_words(e['apellido_nombre']) for e in empleados_db}
 
+    col_map_done = False
+    col_mapping = {}
     for _, row in df.iterrows():
         cuil_raw = row.get(col_cuil) if col_cuil else None
         nombre_raw = row.get(col_nombre) if col_nombre else None
@@ -706,29 +708,67 @@ def procesar_excel_novedades(file_path):
                     continue
 
         if emp_id:
-            def _get_val(keys):
-                for k in keys:
-                    for c in df.columns:
-                        if k.upper() in str(c).upper().replace(' ', ''):
-                            val = row[c]
-                            if pd.isna(val) or str(val).strip() == '':
-                                continue
-                            val_str = str(val).replace('$', '').replace(' ', '').replace(',', '.')
-                            try:
-                                return float(val_str)
-                            except ValueError:
-                                continue
-                return 0.0
+            # Mapeo de columnas: se pre-calcula una sola vez
+            if not col_map_done:
+                col_map_done = True
+                import re as _re
+
+                def _norm_col(c):
+                    """Normaliza nombre de columna: mayúscula, sin espacios/puntos/saltos."""
+                    return _re.sub(r'[^A-Z0-9%]', '', str(c).upper())
+
+                def _match_col(keywords, columns):
+                    """Busca columna que contenga TODAS las keywords requeridas.
+                    Cada keyword debe aparecer en el nombre de columna normalizado.
+                    Se devuelve la primera columna que matchee todos los keywords del primer grupo que tenga match."""
+                    for kw_group in keywords:
+                        # Cada grupo es una lista de palabras que TODAS deben estar presentes
+                        parts = [_re.sub(r'[^A-Z0-9%]', '', p.upper()) for p in kw_group]
+                        for c in columns:
+                            cn = _norm_col(c)
+                            if all(p in cn for p in parts):
+                                return c
+                    return None
+
+                # Cada entrada es una lista de grupos de keywords (se prueba en orden de prioridad).
+                # Un grupo matchea si TODAS sus partes aparecen en el nombre de columna.
+                col_mapping = {
+                    'dias_vacaciones': _match_col([['VACACION'], ['VAC']], df.columns),
+                    'horas_extra_50': _match_col([['50%'], ['50', 'EXTRA'], ['50', 'HS']], df.columns),
+                    'horas_extra_100': _match_col([['100%'], ['100', 'EXTRA'], ['100', 'HS']], df.columns),
+                    'trabajos_varios': _match_col([['TRABAJO', 'VARIO'], ['TRAB', 'VARIO']], df.columns),
+                    'viaticos': _match_col([['VIATICO']], df.columns),
+                    'remplazo_encargado': _match_col([['REMPLAZO', 'ENCARGADO'], ['REEMPLAZO', 'ENCARGADO'], ['REMPLAZO'], ['REEMPLAZO']], df.columns),
+                    'concepto_libre_1_nombre': _match_col([['CONCEPTO', 'NOMBRE'], ['OTRO', 'NOMBRE']], df.columns),
+                    'concepto_libre_1_importe': _match_col([['CONCEPTO', 'IMPORTE'], ['OTRO', 'IMPORTE']], df.columns),
+                }
+                # Registrar columnas detectadas en diagnóstico
+                diagnostico['columnas_detectadas'] = {k: str(v) for k, v in col_mapping.items() if v is not None}
+                # Registrar TODAS las columnas del Excel para referencia
+                diagnostico['columnas_excel'] = [str(c) for c in df.columns]
+
+            def _get_val_mapped(col):
+                """Obtiene valor numérico de una columna ya mapeada."""
+                if col is None:
+                    return 0.0
+                val = row[col]
+                if pd.isna(val) or str(val).strip() == '':
+                    return 0.0
+                val_str = str(val).replace('$', '').replace(' ', '').replace(',', '.')
+                try:
+                    return float(val_str)
+                except ValueError:
+                    return 0.0
 
             row_novs = {
-                'dias_vacaciones': _get_val(['DIASVACACIONES', 'VACACIONES', 'VAC']),
-                'horas_extra_50': _get_val(['50%', '50', 'HS50', 'HORAS50']),
-                'horas_extra_100': _get_val(['100%', '100', 'HS100', 'HORAS100']),
-                'trabajos_varios': _get_val(['TRABAJOSVARIOS', 'VARIOS', 'TRABVARIOS']),
-                'viaticos': _get_val(['C2VIATICOS', 'VIATICOS', 'VIATICO']),
-                'remplazo_encargado': _get_val(['REMPLAZOENCARGADO', 'REEMPLAZO', 'REEMPLAZOENCARGADO', 'ENCARGADO']),
-                'concepto_libre_1_nombre': str(row.get('OTRO CONCEPTO NOMBRE', '')) if pd.notna(row.get('OTRO CONCEPTO NOMBRE')) else '',
-                'concepto_libre_1_importe': float(row.get('OTRO CONCEPTO IMPORTE', 0)) if pd.notna(row.get('OTRO CONCEPTO IMPORTE')) else 0.0
+                'dias_vacaciones': _get_val_mapped(col_mapping['dias_vacaciones']),
+                'horas_extra_50': _get_val_mapped(col_mapping['horas_extra_50']),
+                'horas_extra_100': _get_val_mapped(col_mapping['horas_extra_100']),
+                'trabajos_varios': _get_val_mapped(col_mapping['trabajos_varios']),
+                'viaticos': _get_val_mapped(col_mapping['viaticos']),
+                'remplazo_encargado': _get_val_mapped(col_mapping['remplazo_encargado']),
+                'concepto_libre_1_nombre': str(row.get(col_mapping['concepto_libre_1_nombre'], '')) if col_mapping['concepto_libre_1_nombre'] and pd.notna(row.get(col_mapping['concepto_libre_1_nombre'])) else '',
+                'concepto_libre_1_importe': _get_val_mapped(col_mapping['concepto_libre_1_importe']),
             }
             
             # FILTRO DE SEGURIDAD REBAJADO: Solo omitir si la fila es genuinamente vacía

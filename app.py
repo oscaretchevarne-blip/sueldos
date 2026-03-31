@@ -1608,7 +1608,7 @@ with tab_liq:
 
                     if uploaded_files:
                         res_total = {}
-                        diag_total = {'macheos': [], 'no_encontrados': []}
+                        diag_total = {'macheos': [], 'no_encontrados': [], 'columnas_detectadas': {}}
                         errores = []
                         for ufile in uploaded_files:
                             res_full = import_data.procesar_excel_novedades(ufile)
@@ -1636,6 +1636,13 @@ with tab_liq:
                                 d = res_full.get('diagnostico', {})
                                 diag_total['macheos'].extend(d.get('macheos_exitosos', []))
                                 diag_total['no_encontrados'].extend(d.get('no_encontrados', []))
+                                # Acumular columnas detectadas
+                                cols_det = d.get('columnas_detectadas', {})
+                                if cols_det:
+                                    diag_total['columnas_detectadas'].update(cols_det)
+                                cols_xl = d.get('columnas_excel', [])
+                                if cols_xl:
+                                    diag_total['columnas_excel'] = cols_xl
                         
                         if errores:
                             for err in errores:
@@ -1647,10 +1654,36 @@ with tab_liq:
                                 v_dict['periodo_id'] = periodo_id
                                 v_dict['empleado_id'] = eid
                                 db.guardar_novedad_importada(v_dict)
-                            
+
                             st.session_state.novedades_importadas = db.get_novedades_importadas(periodo_id)
                             st.success(f"✅ Se procesaron y guardaron novedades para {len(res_total)} empleados en la base de datos.")
-                            
+
+                            # Mostrar columnas detectadas del Excel
+                            cols_det = diag_total.get('columnas_detectadas', {})
+                            nombres_concepto = {
+                                'horas_extra_50': 'Hs Extra 50%',
+                                'horas_extra_100': 'Hs Extra 100%',
+                                'dias_vacaciones': 'Días Vacaciones',
+                                'trabajos_varios': 'Trabajos Varios',
+                                'viaticos': 'Viáticos',
+                                'remplazo_encargado': 'Remplazo Encargado',
+                                'concepto_libre_1_nombre': 'Concepto Libre Nombre',
+                                'concepto_libre_1_importe': 'Concepto Libre Importe',
+                            }
+                            with st.expander("📋 Columnas detectadas en el Excel", expanded=True):
+                                if cols_det:
+                                    for campo, col_excel in cols_det.items():
+                                        label = nombres_concepto.get(campo, campo)
+                                        st.write(f"✅ **{label}** ← columna: `{col_excel}`")
+                                no_detectadas = [nombres_concepto.get(k, k) for k in nombres_concepto if k not in cols_det]
+                                if no_detectadas:
+                                    for nd in no_detectadas:
+                                        st.write(f"⬜ **{nd}** — no detectada")
+                                # Mostrar todas las columnas del Excel para referencia
+                                cols_excel = diag_total.get('columnas_excel', [])
+                                if cols_excel:
+                                    st.caption(f"Columnas en el Excel: {', '.join(cols_excel)}")
+
                             with st.expander("🔍 Ver Detalle de Procesamiento"):
                                 if diag_total['macheos']:
                                     st.write("**Filas Procesadas con Éxito:**")

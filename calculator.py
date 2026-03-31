@@ -116,16 +116,19 @@ def calcular_liquidacion(empleado, periodo_mes, periodo_anio, novedades):
         # Valor hora del mensualizado: basico / 187 (hs promedio del mes)
         if valor_mensual > 0:
             valor_hora = round(valor_mensual / 187.0, 2)
-        
+
         # Basico proporcional segun dias trabajados (que app.py ya pre-completa con el legajo)
         dias_a_liq = dias_trabajados if dias_trabajados > 0 else float(empleado.get('dias_liquidacion_mensual', 30.0) or 30.0)
-        
+
         if empleado.get('liquida_mensual', 0):
             importe_basico_mensual = valor_mensual * (dias_a_liq / 30.0)
             # Asegurar que el reporte refleje los dias que usamos para liquidar
             resultado['dias_trabajados'] = dias_a_liq
     else:
-        # JORNAL / EVENTUAL: calculo por horas comunes
+        # JORNAL / EVENTUAL: si no hay valor_hora pero sí valor_mensual, derivarlo
+        if valor_hora == 0 and valor_mensual > 0:
+            valor_hora = round(valor_mensual / 187.0, 2)
+        # Calculo por horas comunes
         importe_horas_comunes = horas_comunes * valor_hora
 
     # Extras: ambos tipos usan valor_hora (para mensualizado es basico/187)
