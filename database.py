@@ -601,14 +601,25 @@ def aplicar_aumento_masivo_fc(porcentaje, seccion=None):
     logger.info(f"Aumento masivo FC aplicado: {porcentaje}% a {len(empleados_antes)} empleados")
 
 
-def get_ultimo_aumento_fc():
-    """Obtiene el último aumento masivo FC no revertido."""
+def get_ultimo_aumento_fc(mes=None, anio=None):
+    """Obtiene el último aumento masivo FC no revertido del período indicado.
+    Si no se pasan mes/anio, busca cualquier aumento no revertido (legacy)."""
     conn = get_connection()
-    row = conn.execute("""
-        SELECT * FROM historial_aumentos_fc
-        WHERE revertido = 0
-        ORDER BY id DESC LIMIT 1
-    """).fetchone()
+    if mes and anio:
+        # Solo buscar aumentos aplicados dentro del mes/año del período activo
+        row = conn.execute("""
+            SELECT * FROM historial_aumentos_fc
+            WHERE revertido = 0
+              AND CAST(strftime('%%m', fecha) AS INTEGER) = ?
+              AND CAST(strftime('%%Y', fecha) AS INTEGER) = ?
+            ORDER BY id DESC LIMIT 1
+        """, (mes, anio)).fetchone()
+    else:
+        row = conn.execute("""
+            SELECT * FROM historial_aumentos_fc
+            WHERE revertido = 0
+            ORDER BY id DESC LIMIT 1
+        """).fetchone()
     conn.close()
     return dict(row) if row else None
 
@@ -750,13 +761,26 @@ def get_categoria_por_nombre(nombre):
 
 
 def crear_valor_categoria(categoria_id, valor_hora, valor_mensual, mes, anio):
-    """Agrega un valor de categoría para un período específico."""
+    """Agrega o actualiza un valor de categoría para un período específico (upsert)."""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("""
-        INSERT INTO categoria_valores (categoria_id, valor_hora, valor_mensual, vigencia_mes, vigencia_anio)
-        VALUES (?, ?, ?, ?, ?)
-    """, (categoria_id, valor_hora, valor_mensual, mes, anio))
+    # Verificar si ya existe un valor para esta categoría/mes/año
+    existing = c.execute("""
+        SELECT id FROM categoria_valores
+        WHERE categoria_id = ? AND vigencia_mes = ? AND vigencia_anio = ?
+        ORDER BY id DESC LIMIT 1
+    """, (categoria_id, mes, anio)).fetchone()
+    if existing:
+        c.execute("""
+            UPDATE categoria_valores
+            SET valor_hora = ?, valor_mensual = ?, created_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (valor_hora, valor_mensual, existing[0]))
+    else:
+        c.execute("""
+            INSERT INTO categoria_valores (categoria_id, valor_hora, valor_mensual, vigencia_mes, vigencia_anio)
+            VALUES (?, ?, ?, ?, ?)
+        """, (categoria_id, valor_hora, valor_mensual, mes, anio))
     conn.commit()
     conn.close()
 
@@ -869,6 +893,10 @@ def cerrar_periodo(periodo_id):
 
         # Resetear días de liquidación mensual si no son permanentes
         conn.execute("UPDATE empleados SET dias_liquidacion_mensual = 30 WHERE dias_mensuales_permanente = 0")
+
+        # Marcar aumentos FC no revertidos como consumidos (revertido=2)
+        # para que no bloqueen aumentos en el siguiente período
+        conn.execute("UPDATE historial_aumentos_fc SET revertido = 2 WHERE revertido = 0")
 
         conn.commit()
         logger.info(f"Período ID={periodo_id} cerrado exitosamente")

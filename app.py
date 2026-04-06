@@ -1165,8 +1165,8 @@ with tab_admin:
 
                     st.markdown(f"**Total empleados afectados: {total_afectados}**")
 
-                    # Verificar si ya hay un aumento pendiente sin revertir
-                    ultimo_aumento = db.get_ultimo_aumento_fc()
+                    # Verificar si ya hay un aumento pendiente sin revertir EN ESTE PERÍODO
+                    ultimo_aumento = db.get_ultimo_aumento_fc(mes=m, anio=a)
                     ya_aplicado = ultimo_aumento and not ultimo_aumento.get('revertido', 0)
 
                     if ya_aplicado:
@@ -1188,7 +1188,7 @@ with tab_admin:
 
                 # --- Retrotraer último aumento ---
                 st.divider()
-                ultimo = db.get_ultimo_aumento_fc()
+                ultimo = db.get_ultimo_aumento_fc(mes=m, anio=a)
                 if ultimo:
                     st.markdown(f"**Último aumento aplicado:** {ultimo['porcentaje']}% — "
                                 f"{ultimo['cantidad_empleados']} empleados — "
@@ -1381,26 +1381,33 @@ with tab_admin:
                             st.warning("⚠️ Al confirmar, se actualizarán los valores de convenio para el mes activo.")
                             
                             conf_conv = st.checkbox("✅ Confirmo que deseo cargar estos valores de convenio", key="conf_cargar_conv")
-                            
+
                             if conf_conv:
                                 if st.button("💾 Cargar Convenio", type="primary", use_container_width=True, key="btn_cargar_conv"):
-                                    # Guardar valores a DB
+                                    # Guardar valores de TODOS los meses del archivo (no solo el activo)
+                                    # Así al cerrar un período, el siguiente ya tiene sus valores cargados
                                     filas_guardadas = 0
-                                    for _, fila in df_mes_activo.iterrows():
+                                    meses_guardados = set()
+                                    for _, fila in df_conv.iterrows():
                                         nombre_cat = str(fila[col_cat]).strip()
+                                        if not nombre_cat or nombre_cat.lower() == 'nan':
+                                            continue
                                         nombre_conv = import_data.mapear_categoria_excel_a_convenio(nombre_cat) or nombre_cat
                                         cat_obj = db.get_categoria_por_nombre(nombre_conv)
                                         if not cat_obj:
-                                            # Crear categoría si no existe
                                             cat_id = db.crear_categoria(nombre_conv, 'PRODUCCION')
                                         else:
                                             cat_id = cat_obj['id']
                                         vh = float(fila[col_vh]) if col_vh and pd.notna(fila.get(col_vh)) else 0.0
                                         vm = float(fila[col_vm]) if col_vm and pd.notna(fila.get(col_vm)) else 0.0
-                                        db.crear_valor_categoria(cat_id, vh, vm, m, a)
+                                        fila_mes = int(fila[col_mes]) if col_mes and pd.notna(fila.get(col_mes)) else m
+                                        fila_anio = int(fila[col_anio]) if col_anio and pd.notna(fila.get(col_anio)) else a
+                                        db.crear_valor_categoria(cat_id, vh, vm, fila_mes, fila_anio)
                                         filas_guardadas += 1
-                                    
-                                    st.success(f"✅ Se cargaron {filas_guardadas} categorías para {m}/{a}")
+                                        meses_guardados.add(f"{fila_mes:02d}/{fila_anio}")
+
+                                    meses_str = ", ".join(sorted(meses_guardados))
+                                    st.success(f"✅ Se cargaron {filas_guardadas} valores para los meses: **{meses_str}**")
 
                                     # Calcular variación real para preguntar aumento
                                     porc_real, _ = import_data.aplicar_aumento_fuera_convenio.__wrapped__(m, a) if hasattr(import_data.aplicar_aumento_fuera_convenio, '__wrapped__') else (pct_variacion, 0)
@@ -1422,7 +1429,10 @@ with tab_admin:
                 st.info("💡 Si no subís archivo, el período usará los valores de convenio ya cargados (del período anterior).")
 
         # ── Pregunta de aumento a Fuera de Convenio + Dif. Sueldo ──
-        if 'pct_aumento_pendiente' in st.session_state:
+        # Solo mostrar si el aumento corresponde al período activo (no arrastrar de períodos cerrados)
+        if 'pct_aumento_pendiente' in st.session_state and \
+           st.session_state.get('pct_aumento_mes') == m and \
+           st.session_state.get('pct_aumento_anio') == a:
             pct = st.session_state['pct_aumento_pendiente']
             emps_fc = db.get_empleados(estado='ACTIVO', fuera_convenio=1)
             emps_bc_dif = [e for e in db.get_empleados(estado='ACTIVO', fuera_convenio=0) if float(e.get('diferencia_sueldo', 0) or 0) > 0]
@@ -2206,7 +2216,11 @@ with tab_liq:
                     
                     # 2. Cerrar
                     db.cerrar_periodo(periodo_id)
-                    
+
+                    # Limpiar aumento pendiente del período cerrado (no debe arrastrarse)
+                    for key in ['pct_aumento_pendiente', 'pct_aumento_mes', 'pct_aumento_anio']:
+                        st.session_state.pop(key, None)
+
                     # 3. Calcular siguiente periodo
                     # Si q=1 -> q=2, mismo mes. Si q=2 -> q=1, sig mes.
                     next_q = 2 if q == 1 else 1
@@ -2216,7 +2230,15 @@ with tab_liq:
                     # Crear si no existe
                     if not db.get_periodo(next_q, next_m, next_a):
                         db.crear_periodo(next_q, next_m, next_a)
-                    
+
+                    # Verificar si el nuevo período ya tiene valores de convenio cargados
+                    cats = db.get_categorias()
+                    cats_con_valor = 0
+                    for cat in cats:
+                        v = db.get_valor_categoria(cat['nombre'], next_m, next_a)
+                        if v and v.get('vigencia_mes') == next_m and v.get('vigencia_anio') == next_a:
+                            cats_con_valor += 1
+
                     # Actualizar session_state para que apunte al nuevo
                     st.session_state.periodo_quincena = next_q
                     st.session_state.periodo_mes = next_m
@@ -2225,8 +2247,12 @@ with tab_liq:
                     st.session_state['sel_q'] = next_q
                     st.session_state['sel_m'] = next_m
                     st.session_state['sel_a'] = next_a
-                    
+
                     st.success(f"✅ Período {periodo_str} cerrado. Se ha habilitado el período {next_q:02d}/{next_m:02d}/{next_a}.")
+                    if cats_con_valor > 0:
+                        st.info(f"📋 El nuevo período ya tiene **{cats_con_valor}** categorías con valores de convenio cargados.")
+                    else:
+                        st.warning(f"⚠️ El nuevo período no tiene valores de convenio. Subí el archivo de convenio en la pestaña Categorías.")
                     st.balloons()
                     st.rerun()
 
