@@ -285,6 +285,10 @@ class ReciboPDF(FPDF):
         self.line(ml + aw - 60, firma_y, ml + aw - 5, firma_y)
         self.set_xy(ml + aw - 60, firma_y + 1)
         self.cell(55, 4, 'FIRMA', 0, 0, 'C')
+        # Apellido y nombre completo debajo de FIRMA
+        self.set_font('Helvetica', 'B', 7)
+        self.set_xy(ml + aw - 60, firma_y + 5)
+        self.cell(55, 4, _ascii(empleado.get('apellido_nombre', '')), 0, 0, 'C')
 
 
 def generar_recibos_pdf(liquidaciones, empleados_dict, periodo):
