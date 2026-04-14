@@ -66,94 +66,77 @@ USUARIOS = {
 }
 
 def login():
-    """Pantalla de login elegante."""
+    """Pantalla de login corporativa profesional."""
     st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        .stApp {
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%) !important;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        .stApp { background: linear-gradient(160deg, #0a0f1e 0%, #111827 40%, #0f1729 100%) !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        [data-testid="stSidebar"] { display: none !important; }
+        .login-header {
+            text-align: center; padding: 20px 0 10px;
         }
-        .login-card {
-            background: rgba(30, 41, 59, 0.85);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(99, 102, 241, 0.3);
-            border-radius: 20px;
-            padding: 48px 40px;
-            max-width: 420px;
-            margin: 0 auto;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.1);
+        .login-logo-box {
+            width: 56px; height: 56px; margin: 0 auto 16px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            border-radius: 14px; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 8px 24px rgba(59,130,246,0.25);
         }
-        .login-icon {
-            font-size: 56px;
-            text-align: center;
-            margin-bottom: 8px;
-        }
-        .login-title {
-            font-family: 'Inter', sans-serif;
-            font-weight: 700;
-            font-size: 28px;
-            text-align: center;
-            color: #f1f5f9;
-            margin-bottom: 4px;
-        }
-        .login-subtitle {
-            font-family: 'Inter', sans-serif;
-            font-weight: 400;
-            font-size: 14px;
-            text-align: center;
-            color: #94a3b8;
-            margin-bottom: 32px;
-        }
-        .login-footer {
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            text-align: center;
-            color: #475569;
-            margin-top: 24px;
-        }
-        /* Mobile responsive */
-        @media (max-width: 768px) {
-            .login-card {
-                padding: 32px 20px;
-                margin: 0 8px;
-                border-radius: 16px;
-            }
-            .login-icon { font-size: 44px; }
-            .login-title { font-size: 22px; }
-            .login-subtitle { font-size: 13px; margin-bottom: 20px; }
-        }
+        .login-logo-box svg { width: 28px; height: 28px; fill: white; }
+        .login-brand { font-family:'Inter',sans-serif; font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:3px; color:#3b82f6; margin-bottom:4px; }
+        .login-title { font-family:'Inter',sans-serif; font-weight:700; font-size:24px; color:#f1f5f9; letter-spacing:-0.3px; margin-bottom:2px; }
+        .login-subtitle { font-family:'Inter',sans-serif; font-weight:400; font-size:13px; color:#64748b; }
+        .login-sep { height:1px; background:linear-gradient(90deg,transparent,rgba(148,163,184,0.15),transparent); margin:16px 0; }
+        .login-field-label { font-family:'Inter',sans-serif; font-weight:600; font-size:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.8px; margin:8px 0 2px; }
+        .login-footer { font-family:'Inter',sans-serif; font-size:11px; text-align:center; color:#475569; margin-top:16px; }
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.5, 1])
-    with col2:
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        st.markdown('<div class="login-icon">💰</div>', unsafe_allow_html=True)
-        st.markdown('<div class="login-title">Liquidacion de Sueldos</div>', unsafe_allow_html=True)
-        st.markdown('<div class="login-subtitle">Ingrese sus credenciales para acceder al sistema</div>', unsafe_allow_html=True)
+    _sp1, col_login, _sp2 = st.columns([1.3, 1.4, 1.3])
+    with col_login:
+        st.markdown("")
+        st.markdown("")
+        # Header visual
+        st.markdown("""<div class="login-header">
+            <div class="login-logo-box">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                    <polyline points="14 2 14 8 20 8" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                    <text x="12" y="17" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="8" fill="white">$</text>
+                </svg>
+            </div>
+            <div class="login-brand">Sistema de Gestión</div>
+            <div class="login-title">Liquidación de Sueldos</div>
+            <div class="login-subtitle">Ingrese sus credenciales para continuar</div>
+        </div>""", unsafe_allow_html=True)
 
-        usuario = st.text_input("👤 Usuario", key="login_user", placeholder="Ingrese su usuario")
-        clave = st.text_input("🔒 Contrasena", type="password", key="login_pass", placeholder="Ingrese su contrasena")
+        st.markdown('<div class="login-sep"></div>', unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔓  INGRESAR AL SISTEMA", use_container_width=True, type="primary"):
+        # Campos de login — widgets nativos de Streamlit (siempre visibles)
+        st.markdown('<div class="login-field-label">Usuario</div>', unsafe_allow_html=True)
+        usuario = st.text_input("Usuario", key="login_user", placeholder="Ingrese su usuario", label_visibility="collapsed")
+
+        st.markdown('<div class="login-field-label">Contraseña</div>', unsafe_allow_html=True)
+        clave = st.text_input("Contraseña", type="password", key="login_pass", placeholder="Ingrese su contraseña", label_visibility="collapsed")
+
+        st.markdown("")
+        if st.button("Iniciar Sesión", use_container_width=True, type="primary"):
             if usuario in USUARIOS and USUARIOS[usuario] == clave:
                 st.session_state["autenticado"] = True
                 st.session_state["usuario"] = usuario
                 st.rerun()
             else:
-                st.error("❌ Usuario o contrasena incorrectos.")
+                st.error("Credenciales incorrectas. Intente nuevamente.")
 
-        st.markdown('<div class="login-footer">Sistema protegido · Acceso autorizado unicamente</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="login-footer">Acceso restringido · Solo personal autorizado</div>', unsafe_allow_html=True)
+
     st.stop()
 
 if not st.session_state.get("autenticado", False):
     login()
 else:
     # Limpiar cualquier residuo visual del login
-    st.markdown("""<style>.login-card{display:none !important;}</style>""", unsafe_allow_html=True)
+    st.markdown("""<style>.login-header,.login-sep,.login-field-label,.login-footer{display:none !important;}</style>""", unsafe_allow_html=True)
 
 # Mostrar mensajes de éxito pendientes (por rerun)
 if 'mensaje_exito' in st.session_state:
@@ -235,15 +218,23 @@ st.markdown("""
     .stButton > button, div[data-testid="stDownloadButton"] > button {
         border-radius: 10px !important;
         font-weight: 600 !important;
-        background-color: #334155 !important; /* Slate background for secondary buttons */
+        background-color: #334155 !important;
         color: #ffffff !important;
         border: 1px solid rgba(255,255,255,0.2) !important;
         transition: all 0.2s ease !important;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.02em;
         padding: 0.6rem 1.2rem !important;
     }
-    
+    /* Forzar texto visible dentro de botones */
+    .stButton > button span, .stButton > button p,
+    div[data-testid="stDownloadButton"] > button span,
+    div[data-testid="stDownloadButton"] > button p,
+    .stButton > button div, div[data-testid="stFormSubmitButton"] > button span,
+    div[data-testid="stFormSubmitButton"] > button p {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+
     .stButton > button:hover, div[data-testid="stDownloadButton"] > button:hover {
         transform: translateY(-2px);
         background-color: #475569 !important;
@@ -251,16 +242,39 @@ st.markdown("""
         color: #ffffff !important;
         box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    
+
     /* Primary buttons (Indigo) */
-    .stButton > button[kind="primary"] {
+    .stButton > button[kind="primary"],
+    div[data-testid="stFormSubmitButton"] > button {
         background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
         border: none !important;
         color: #ffffff !important;
     }
-    .stButton > button[kind="primary"]:hover {
+    .stButton > button[kind="primary"] span,
+    .stButton > button[kind="primary"] p,
+    div[data-testid="stFormSubmitButton"] > button span,
+    div[data-testid="stFormSubmitButton"] > button p {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+    .stButton > button[kind="primary"]:hover,
+    div[data-testid="stFormSubmitButton"] > button:hover {
         background: linear-gradient(135deg, #818cf8, #6366f1) !important;
         box-shadow: 0 0 20px rgba(99, 102, 241, 0.4) !important;
+    }
+
+    /* Disabled buttons - texto gris visible, no invisible */
+    .stButton > button:disabled,
+    div[data-testid="stFormSubmitButton"] > button:disabled {
+        background-color: #1e293b !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        opacity: 0.7 !important;
+    }
+    .stButton > button:disabled span,
+    .stButton > button:disabled p,
+    div[data-testid="stFormSubmitButton"] > button:disabled span {
+        color: #94a3b8 !important;
+        -webkit-text-fill-color: #94a3b8 !important;
     }
 
     /* Checkboxes: HIGH CONTRAST FIX */
@@ -294,8 +308,10 @@ st.markdown("""
     }
 
     /* SPECIFIC FIX FOR CHECKBOX LABELS */
-    div[data-testid="stCheckbox"] label p {
+    div[data-testid="stCheckbox"] label p,
+    div[data-testid="stCheckbox"] label span {
         color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
         font-weight: 600 !important;
         font-size: 1.05rem !important;
     }
@@ -313,24 +329,48 @@ st.markdown("""
     }
 
     /* Input fields themselves */
-    .stNumberInput input, .stTextInput input, .stSelectbox [data-baseweb="select"], .stDateInput input {
+    .stNumberInput input, .stTextInput input, .stSelectbox [data-baseweb="select"],
+    .stDateInput input, .stTextArea textarea {
         color: #ffffff !important;
-        background-color: #1e293b !important; /* Solid dark background for inputs */
+        -webkit-text-fill-color: #ffffff !important;
+        background-color: #1e293b !important;
         border: 1px solid var(--glass-border) !important;
     }
 
-    /* SPECIFIC FIX FOR DISABLED FIELDS (Make them readable) */
-    input:disabled, [data-disabled="true"] {
-        -webkit-text-fill-color: #ffffff !important; /* Force white even when disabled */
-        color: #ffffff !important;
-        background-color: #334155 !important; /* Slightly lighter but still dark background for disabled */
+    /* Placeholder visible */
+    .stTextInput input::placeholder, .stNumberInput input::placeholder,
+    .stTextArea textarea::placeholder {
+        color: #64748b !important;
+        -webkit-text-fill-color: #64748b !important;
         opacity: 1 !important;
     }
-    
+
+    /* SPECIFIC FIX FOR DISABLED FIELDS (Make them readable) */
+    input:disabled, [data-disabled="true"], textarea:disabled {
+        -webkit-text-fill-color: #cbd5e1 !important;
+        color: #cbd5e1 !important;
+        background-color: #334155 !important;
+        opacity: 1 !important;
+    }
+
     /* Selectbox specifically */
     div[data-baseweb="select"] > div {
         color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
         background-color: #1e293b !important;
+    }
+    /* Selectbox dropdown items */
+    ul[role="listbox"] li {
+        color: #ffffff !important;
+        background-color: #1e293b !important;
+    }
+    ul[role="listbox"] li:hover {
+        background-color: #334155 !important;
+    }
+    /* Selectbox selected value */
+    div[data-baseweb="select"] span {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
     }
 
     /* Sidebar cleanup */
@@ -463,6 +503,60 @@ st.markdown("""
         /* Ocultar elementos decorativos pesados en movil */
         .stDeployButton { display: none !important; }
     }
+
+    /* ═══ FICHA RESUMEN EMPLEADO ═══ */
+    .emp-card {
+        background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(30,41,59,0.8));
+        border: 1px solid rgba(99,102,241,0.3);
+        border-radius: 14px;
+        padding: 18px 24px;
+        margin-bottom: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+        align-items: center;
+    }
+    .emp-card .emp-name {
+        font-size: 20px;
+        font-weight: 700;
+        color: #fff;
+        min-width: 220px;
+    }
+    .emp-card .emp-tag {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    .emp-card .tag-activo { background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.4); }
+    .emp-card .tag-inactivo { background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); }
+    .emp-card .tag-fc { background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4); }
+    .emp-card .tag-bc { background: rgba(99,102,241,0.2); color: #818cf8; border: 1px solid rgba(99,102,241,0.4); }
+    .emp-card .emp-detail {
+        color: #94a3b8;
+        font-size: 13px;
+    }
+    .emp-card .emp-detail strong { color: #e2e8f0; }
+
+    /* ═══ SECTION HEADERS ═══ */
+    .section-hdr {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        margin: 12px 0 8px 0;
+        display: inline-block;
+    }
+    .sh-personal { background: rgba(99,102,241,0.15); color: #818cf8; border-left: 3px solid #6366f1; }
+    .sh-laboral { background: rgba(16,185,129,0.15); color: #34d399; border-left: 3px solid #10b981; }
+    .sh-liquidacion { background: rgba(245,158,11,0.15); color: #fbbf24; border-left: 3px solid #f59e0b; }
+    .sh-conceptos { background: rgba(236,72,153,0.15); color: #f472b6; border-left: 3px solid #ec4899; }
+    .sh-descuentos { background: rgba(239,68,68,0.15); color: #f87171; border-left: 3px solid #ef4444; }
+    .sh-contab { background: rgba(34,211,238,0.15); color: #67e8f9; border-left: 3px solid #22d3ee; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -619,94 +713,107 @@ with tab_admin:
                 emp_filtrados = [e for e in emp_filtrados if e['seccion'] == f_sec]
 
             st.markdown("---")
-            st.markdown("### ✏️ Editar / Crear Empleado")
-            
-            accion = st.radio("Acción", ["Editar empleado existente", "Crear nuevo empleado"], horizontal=True, key=f"rad_acc_{emp_id if 'emp_id' in locals() else 'global'}")
 
-            if accion == "Editar empleado existente":
+            tab_editar, tab_crear = st.tabs(["✏️ Editar Empleado", "➕ Crear Nuevo Empleado"])
+
+            with tab_editar:
                 if 'sel_emp_key_cnt' not in st.session_state:
                     st.session_state.sel_emp_key_cnt = 0
-                    
-                opciones_nombres = ["--- Seleccione un empleado ---"] + [f"{e['id']} - {e['apellido_nombre']}" for e in emp_filtrados]
+
                 opciones_dict = {f"{e['id']} - {e['apellido_nombre']}": e['id'] for e in emp_filtrados}
-                
-                col_sel, col_limpiar = st.columns([5, 1])
-                with col_sel:
-                    sel = st.selectbox("Seleccionar empleado", opciones_nombres, key=f"sel_emp_edit_{st.session_state.sel_emp_key_cnt}")
-                with col_limpiar:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("🗑️", key="btn_limpiar_sel_emp", help="Limpiar selección"):
-                        st.session_state.sel_emp_key_cnt += 1
-                        st.rerun()
+                emp_lookup = {e['id']: e for e in emp_filtrados}
+
+                # ── Buscador con preview instantánea ──
+                busq_emp = st.text_input("Buscar empleado por nombre, ID o CUIL", key="busq_emp_edit", placeholder="Ej: Vidal, 134, 20-352...")
+
+                # Filtrar según búsqueda
+                if busq_emp:
+                    busq_lower = busq_emp.strip().lower()
+                    emp_match = [e for e in emp_filtrados if
+                                 busq_lower in e['apellido_nombre'].lower() or
+                                 busq_lower in str(e['id']) or
+                                 busq_lower in str(e.get('cuil', '')).lower()]
+                else:
+                    emp_match = emp_filtrados
+
+                # Si hay resultados mostrar preview cards clickeables
+                if busq_emp and emp_match and len(emp_match) <= 8:
+                    st.caption(f"{len(emp_match)} resultado{'s' if len(emp_match) != 1 else ''}")
+                    for _em in emp_match:
+                        _est = _em.get('estado', 'ACTIVO')
+                        _est_icon = '🟢' if _est == 'ACTIVO' else '🔴'
+                        _conv_txt = 'FC' if _em.get('fuera_convenio') else 'BC'
+                        _btn_label = f"{_est_icon} {_em['id']} - {_em['apellido_nombre']}  |  {_em.get('seccion','—')}  |  {_em.get('categoria','—')}  |  {_est}  |  {_conv_txt}"
+                        if st.button(_btn_label, key=f"pick_emp_{_em['id']}", use_container_width=True):
+                            st.session_state[f'emp_picked_{st.session_state.sel_emp_key_cnt}'] = _em['id']
+                            st.rerun()
+
+                # Determinar empleado seleccionado: por botón de preview o por dropdown
+                picked_id = st.session_state.get(f'emp_picked_{st.session_state.sel_emp_key_cnt}', None)
+
+                if not picked_id:
+                    # Dropdown fallback si no se usó la búsqueda
+                    if not busq_emp or len(emp_match) > 8:
+                        opciones_nombres = [""] + [f"{e['id']} - {e['apellido_nombre']}" for e in emp_match]
+                        sel = st.selectbox("O elegí de la lista completa", opciones_nombres,
+                                          key=f"sel_emp_edit_{st.session_state.sel_emp_key_cnt}")
+                        if sel and sel != "":
+                            picked_id = opciones_dict.get(sel)
 
                 if 'msg_edit_emp' in st.session_state:
                     st.success(st.session_state.msg_edit_emp)
                     del st.session_state.msg_edit_emp
-                
-                if sel and sel != "--- Seleccione un empleado ---":
-                    emp_id = opciones_dict[sel]
+
+                if picked_id:
+                    emp_id = picked_id
                     emp = db.get_empleado(emp_id)
                     if emp:
-                        # Control de desbloqueo (fuera del form para disparar rerun)
-                        desbloqueado = st.checkbox("🔓 Habilitar edición de datos básicos (Nombre, Ingreso, etc.)", 
-                                                   key=f"unlock_{emp_id}")
-                        
-                        if not desbloqueado:
-                            st.info("💡 Marcá el cuadro de arriba para habilitar la edición de este empleado.")
-                        
+                        # ── FICHA RESUMEN ──
+                        _fi_emp = emp.get('fecha_ingreso', '')
+                        _antig = ''
+                        if _fi_emp:
+                            try:
+                                _fi_dt = datetime.strptime(_fi_emp, '%Y-%m-%d').date() if '-' in str(_fi_emp) else datetime.strptime(_fi_emp, '%d/%m/%Y').date()
+                                _antig_y = (date.today() - _fi_dt).days // 365
+                                _antig_m = ((date.today() - _fi_dt).days % 365) // 30
+                                _antig = f"{_antig_y}a {_antig_m}m"
+                            except:
+                                _antig = ''
+                        _estado_tag = 'tag-activo' if emp['estado'] == 'ACTIVO' else 'tag-inactivo'
+                        _conv_tag = 'tag-fc' if emp.get('fuera_convenio') else 'tag-bc'
+                        _conv_label = 'Fuera Conv.' if emp.get('fuera_convenio') else 'Bajo Conv.'
+                        st.markdown(f"""<div class="emp-card">
+                            <div><div class="emp-name">{emp['apellido_nombre']}</div>
+                            <span class="emp-tag {_estado_tag}">{emp['estado']}</span>
+                            <span class="emp-tag {_conv_tag}">{_conv_label}</span></div>
+                            <div class="emp-detail"><strong>CUIL:</strong> {emp.get('cuil','—')} · <strong>Sección:</strong> {emp.get('seccion','—')} · <strong>Categoría:</strong> {emp.get('categoria','—')}</div>
+                            <div class="emp-detail"><strong>Tipo:</strong> {emp.get('tipo','')} · <strong>Condición:</strong> {emp.get('condicion','PERMANENTE')} · <strong>Antigüedad:</strong> {_antig}</div>
+                        </div>""", unsafe_allow_html=True)
+
+                        # Botón para cambiar de empleado
+                        if st.button("Buscar otro empleado", key="btn_cambiar_emp"):
+                            old_key = f'emp_picked_{st.session_state.sel_emp_key_cnt}'
+                            if old_key in st.session_state:
+                                del st.session_state[old_key]
+                            st.session_state.sel_emp_key_cnt += 1
+                            if 'busq_emp_edit' in st.session_state:
+                                del st.session_state['busq_emp_edit']
+                            st.rerun()
+
+                        st.markdown("""<div style="text-align:center; margin:8px 0 4px;">
+                            <span style="background:linear-gradient(135deg,#6366f1,#4f46e5); color:white; padding:6px 20px; border-radius:8px; font-family:Inter,sans-serif; font-size:13px; font-weight:600; letter-spacing:0.5px;">
+                            Formulario de Edición</span>
+                        </div>""", unsafe_allow_html=True)
+
                         with st.form("form_editar_emp"):
-                            # ... todos los inputs se mantienen igual ...
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                nombre = st.text_input("Apellido y Nombre", value=emp['apellido_nombre'], disabled=not desbloqueado, key=f"emp_nom_{emp_id}")
-                                cuil = st.text_input("CUIL", value=emp.get('cuil', ''), disabled=not desbloqueado, key=f"emp_cuil_{emp_id}")
-                                
-                                c_tp1, c_tp2 = st.columns(2)
-                                with c_tp1:
-                                    condicion = st.selectbox("Condición", ["PERMANENTE", "EVENTUAL"],
-                                                        index=["PERMANENTE", "EVENTUAL"].index(emp.get('condicion', 'PERMANENTE')),
-                                                        disabled=not desbloqueado, key=f"emp_cond_{emp_id}")
-                                with c_tp2:
-                                    tipo = st.selectbox("Tipo", ["JORNAL", "MENSUALIZADO"],
-                                                        index=0 if emp['tipo'] == 'JORNAL' else 1,
-                                                        disabled=not desbloqueado, key=f"emp_tipo_{emp_id}")
-                                
-                                seccion = st.text_input("Sección", value=emp.get('seccion', ''), disabled=not desbloqueado, key=f"emp_sec_{emp_id}")
-                                cats_conv = [c['nombre'] for c in db.get_categorias()]
-                                cat_idx = 0
-                                if emp.get('categoria') in cats_conv:
-                                    cat_idx = cats_conv.index(emp['categoria'])
-                                
-                                convenio = st.radio("Convenio", ["Bajo Convenio", "Fuera de Convenio"], 
-                                                    index=0 if not emp.get('fuera_convenio') else 1, horizontal=True,
-                                                    key=f"emp_conv_{emp_id}")
-                                fuera_conv = 1 if convenio == "Fuera de Convenio" else 0
-
-                                c_cat1, c_cat2 = st.columns([1, 1])
-                                with c_cat1:
-                                    categoria = st.selectbox("Categoría", cats_conv, index=cat_idx, key=f"emp_cat_{emp_id}")
-                                with c_cat2:
-                                    val_cat_db = db.get_valor_categoria(categoria, datetime.now().month, datetime.now().year)
-                                    db_val = 0.0
-                                    if val_cat_db:
-                                        db_val = val_cat_db['valor_hora'] if tipo in ["JORNAL", "EVENTUAL"] else val_cat_db['valor_mensual']
-                                    
-                                    label_val = "Valor Hora" if tipo in ["JORNAL", "EVENTUAL"] else "Sueldo Básico"
-                                    
-                                    # Determinar valor a mostrar: si es fuera de convenio prioritizar el manual del legajo
-                                    val_manual = float(emp.get('sueldo_base', 0))
-                                    val_to_show = val_manual if (fuera_conv and val_manual > 0) else db_val
-                                    
-                                    # Siempre permitir edición para evitar confusión del usuario
-                                    sueldo_base = st.number_input(label_val, value=val_to_show, key=f"emp_sb_edit_{emp_id}")
-
-                                    estado = st.selectbox("Estado", ["ACTIVO", "INACTIVO"],
-                                                        index=0 if emp['estado'] == 'ACTIVO' else 1, disabled=not desbloqueado, key=f"emp_est_{emp_id}")
-                                    
-                                    if not fuera_conv and val_manual > 0 and val_manual != db_val:
-                                        st.caption(f"ℹ️ Monto manual guardado: ${_fmt_ar(val_manual)} (Seleccioná 'Fuera de Convenio' para usarlo)")
-
-                            with col2:
+                            # ══ DATOS PERSONALES ══
+                            st.markdown('<div class="section-hdr sh-personal">👤 Datos Personales</div>', unsafe_allow_html=True)
+                            cp1, cp2, cp3, cp4 = st.columns([3, 2, 2, 1.5])
+                            with cp1:
+                                nombre = st.text_input("Apellido y Nombre", value=emp['apellido_nombre'], key=f"emp_nom_{emp_id}")
+                            with cp2:
+                                cuil = st.text_input("CUIL", value=emp.get('cuil', ''), key=f"emp_cuil_{emp_id}")
+                            with cp3:
                                 fi = emp.get('fecha_ingreso')
                                 if fi and isinstance(fi, str):
                                     try:
@@ -719,59 +826,128 @@ with tab_admin:
                                 elif not fi:
                                     fi = date.today()
                                 fi_str = fi.strftime('%d/%m/%Y') if isinstance(fi, date) else ''
-                                fecha_ing_str = st.text_input("Fecha de ingreso (DD/MM/AAAA)", value=fi_str, disabled=not desbloqueado, key=f"emp_fi_{emp_id}")
+                                fecha_ing_str = st.text_input("F. Ingreso (DD/MM/AAAA)", value=fi_str, key=f"emp_fi_{emp_id}")
                                 try:
                                     fecha_ing = datetime.strptime(fecha_ing_str, '%d/%m/%Y').date()
                                 except:
                                     fecha_ing = fi
-                                liq_mensual = st.checkbox("¿Liquida mensual?", value=bool(emp.get('liquida_mensual', 0)), disabled=not desbloqueado, key=f"emp_lm_{emp_id}")
-                                liq_ant_bas = st.checkbox("¿Liquida antigüedad sobre básico?",
-                                                        value=bool(emp.get('liquida_antiguedad_basico', 0)), disabled=not desbloqueado, key=f"emp_lab_{emp_id}")
-                                liq_present = st.checkbox("¿Liquida presentismo?",
-                                                        value=bool(emp.get('liquida_presentismo', 1)), disabled=not desbloqueado, key=f"emp_lp_{emp_id}")
-                                pct_pres = st.number_input("Porcentaje Presentismo (%)", value=float(emp.get('porc_presentismo', 15.0)), step=0.01, format="%.2f", disabled=not desbloqueado, key=f"emp_pp_pct_{emp_id}")
-                                
+                            with cp4:
+                                estado = st.selectbox("Estado", ["ACTIVO", "INACTIVO"],
+                                                    index=0 if emp['estado'] == 'ACTIVO' else 1, key=f"emp_est_{emp_id}")
+
+                            # ══ DATOS LABORALES ══
+                            st.markdown('<div class="section-hdr sh-laboral">🏢 Datos Laborales</div>', unsafe_allow_html=True)
+                            cl1, cl2, cl3, cl4 = st.columns(4)
+                            with cl1:
+                                condicion = st.selectbox("Condición", ["PERMANENTE", "EVENTUAL"],
+                                                    index=["PERMANENTE", "EVENTUAL"].index(emp.get('condicion', 'PERMANENTE')),
+                                                    key=f"emp_cond_{emp_id}")
+                            with cl2:
+                                tipo = st.selectbox("Tipo", ["JORNAL", "MENSUALIZADO"],
+                                                    index=0 if emp['tipo'] == 'JORNAL' else 1, key=f"emp_tipo_{emp_id}")
+                            with cl3:
+                                seccion = st.text_input("Sección", value=emp.get('seccion', ''), key=f"emp_sec_{emp_id}")
+                            with cl4:
+                                convenio = st.selectbox("Convenio", ["Bajo Convenio", "Fuera de Convenio"],
+                                                    index=0 if not emp.get('fuera_convenio') else 1,
+                                                    key=f"emp_conv_{emp_id}")
+                                fuera_conv = 1 if convenio == "Fuera de Convenio" else 0
+
+                            cats_conv = [c['nombre'] for c in db.get_categorias()]
+                            cat_idx = 0
+                            if emp.get('categoria') in cats_conv:
+                                cat_idx = cats_conv.index(emp['categoria'])
+
+                            cc1, cc2 = st.columns(2)
+                            with cc1:
+                                categoria = st.selectbox("Categoría", cats_conv, index=cat_idx, key=f"emp_cat_{emp_id}")
+                            with cc2:
+                                val_cat_db = db.get_valor_categoria(categoria, datetime.now().month, datetime.now().year)
+                                db_val = 0.0
+                                if val_cat_db:
+                                    db_val = val_cat_db['valor_hora'] if tipo in ["JORNAL", "EVENTUAL"] else val_cat_db['valor_mensual']
+                                label_val = "Valor Hora" if tipo in ["JORNAL", "EVENTUAL"] else "Sueldo Básico"
+                                val_manual = float(emp.get('sueldo_base', 0))
+                                val_to_show = val_manual if (fuera_conv and val_manual > 0) else db_val
+                                sueldo_base = st.number_input(label_val, value=val_to_show, key=f"emp_sb_edit_{emp_id}")
+                                if not fuera_conv and val_manual > 0 and val_manual != db_val:
+                                    st.caption(f"ℹ️ Monto manual: ${_fmt_ar(val_manual)} (Seleccioná 'Fuera de Convenio' para usarlo)")
+
+                            # ══ CONFIGURACIÓN DE LIQUIDACIÓN ══
+                            st.markdown('<div class="section-hdr sh-liquidacion">⚙️ Configuración de Liquidación</div>', unsafe_allow_html=True)
+                            cq1, cq2, cq3, cq4 = st.columns(4)
+                            with cq1:
+                                liq_mensual = st.checkbox("Liquida mensual", value=bool(emp.get('liquida_mensual', 0)), key=f"emp_lm_{emp_id}")
+                            with cq2:
+                                liq_ant_bas = st.checkbox("Antig. s/básico", value=bool(emp.get('liquida_antiguedad_basico', 0)), key=f"emp_lab_{emp_id}")
+                            with cq3:
+                                liq_present = st.checkbox("Presentismo", value=bool(emp.get('liquida_presentismo', 1)), key=f"emp_lp_{emp_id}")
+                            with cq4:
+                                pct_pres = st.number_input("% Present.", value=float(emp.get('porc_presentismo', 15.0)), step=0.01, format="%.2f", key=f"emp_pp_pct_{emp_id}")
+
+                            cd1, cd2, cd3 = st.columns(3)
+                            with cd1:
                                 if liq_mensual:
-                                    c_dms1, c_dms2 = st.columns(2)
-                                    with c_dms1:
-                                        dias_liq_mensual = st.selectbox("Días a liquidar", list(range(1, 31)), 
-                                                                    index=emp.get('dias_liquidacion_mensual', 30)-1, 
-                                                                    key=f"emp_dlm_{emp_id}")
-                                    with c_dms2:
-                                        # Por defecto SI si es 30, sino segun DB
-                                        def_perm = True if dias_liq_mensual == 30 else bool(emp.get('dias_mensuales_permanente', 1))
-                                        dias_perm = st.checkbox("¿Permanente?", value=def_perm, key=f"emp_dms_p_{emp_id}")
+                                    dias_liq_mensual = st.selectbox("Días a liquidar", list(range(1, 31)),
+                                                                index=emp.get('dias_liquidacion_mensual', 30)-1,
+                                                                key=f"emp_dlm_{emp_id}")
                                 else:
                                     dias_liq_mensual = 30
+                            with cd2:
+                                if liq_mensual:
+                                    def_perm = True if dias_liq_mensual == 30 else bool(emp.get('dias_mensuales_permanente', 1))
+                                    dias_perm = st.checkbox("¿Permanente?", value=def_perm, key=f"emp_dms_p_{emp_id}")
+                                else:
                                     dias_perm = 1
+                            with cd3:
+                                hs_fijas = st.number_input("HS Fijas x período", value=float(emp.get('hs_fijas', 0)), key=f"emp_hf_{emp_id}")
 
-                                st.markdown("---")
-                                c_add_row1, c_add_row2 = st.columns(2)
-                                with c_add_row1:
-                                    anticipos = st.number_input("Anticipos", value=float(emp.get('anticipos', 0)), key=f"emp_ant_{emp_id}")
-                                with c_add_row2:
-                                    acred_banco = st.number_input("Acreditación Banco", value=float(emp.get('acreditacion_banco', 0)), key=f"emp_ab_{emp_id}")
-                                otros = st.number_input("Otros (+ Haber / - Descuento)", value=float(emp.get('otros', 0)), key=f"emp_otr_{emp_id}")
-                                observaciones = st.text_area("Observaciones", value=emp.get('observaciones', ''), key=f"emp_obs_{emp_id}", height=80)
-
-                                dif_sueldo = st.number_input("Diferencia de sueldo", value=float(emp.get('diferencia_sueldo', 0)), key=f"emp_ds_{emp_id}")
-                                premio = st.number_input("Premio producción", value=float(emp.get('premio_produccion', 0)), key=f"emp_pp_{emp_id}")
-                                desc_premio = st.number_input("DESC.PREM.PROD.", value=float(emp.get('descuento_premio_prod', 0)), key=f"emp_dpp_{emp_id}")
+                            # ══ CONCEPTOS VARIABLES ══
+                            st.markdown('<div class="section-hdr sh-conceptos">💰 Conceptos Variables</div>', unsafe_allow_html=True)
+                            cv1, cv2, cv3, cv4 = st.columns(4)
+                            with cv1:
+                                dif_sueldo = st.number_input("Dif. Sueldo", value=float(emp.get('diferencia_sueldo', 0)), key=f"emp_ds_{emp_id}")
+                            with cv2:
+                                premio = st.number_input("Premio Prod.", value=float(emp.get('premio_produccion', 0)), key=f"emp_pp_{emp_id}")
+                            with cv3:
+                                desc_premio = st.number_input("Desc. Premio", value=float(emp.get('descuento_premio_prod', 0)), key=f"emp_dpp_{emp_id}")
+                            with cv4:
                                 cifra_fija = st.number_input("Cifra Fija", value=float(emp.get('cifra_fija', 0)), key=f"emp_cf_{emp_id}")
-                                cobra_cifra_fija = st.checkbox("¿Cobra Cifra Fija?", value=bool(emp.get('cobra_cifra_fija', 0)), key=f"emp_ccf_{emp_id}")
+                            cobra_cifra_fija = st.checkbox("¿Cobra Cifra Fija?", value=bool(emp.get('cobra_cifra_fija', 0)), key=f"emp_ccf_{emp_id}")
+
+                            # ══ DESCUENTOS Y ADICIONALES ══
+                            st.markdown('<div class="section-hdr sh-descuentos">📋 Descuentos y Adicionales</div>', unsafe_allow_html=True)
+                            cx1, cx2, cx3 = st.columns(3)
+                            with cx1:
+                                anticipos = st.number_input("Anticipos", value=float(emp.get('anticipos', 0)), key=f"emp_ant_{emp_id}")
+                            with cx2:
+                                acred_banco = st.number_input("Acred. Banco", value=float(emp.get('acreditacion_banco', 0)), key=f"emp_ab_{emp_id}")
+                            with cx3:
+                                otros = st.number_input("Otros (+/-)", value=float(emp.get('otros', 0)), key=f"emp_otr_{emp_id}")
+
+                            cj1, cj2, cj3 = st.columns(3)
+                            with cj1:
                                 jubilacion = st.number_input("Jubilación", value=float(emp.get('jubilacion', 0)), key=f"emp_jub_{emp_id}")
+                            with cj2:
                                 obra_social = st.number_input("Obra Social", value=float(emp.get('obra_social', 0)), key=f"emp_os_{emp_id}")
+                            with cj3:
                                 seguro = st.number_input("Seguro", value=float(emp.get('seguro', 0)), key=f"emp_seg_{emp_id}")
-                                hs_fijas = st.number_input("HS Fijas por periodo", value=float(emp.get('hs_fijas', 0)), key=f"emp_hf_{emp_id}")
-                                st.markdown("**Contabilidad:**")
-                                codigo_contable = st.text_input("Código Contable (subcuenta individual)", value=emp.get('codigo_contable', '') or '', key=f"emp_cc_{emp_id}", help="Ej: 1.1.070.10.006 (para empleados Fuera de SIJIP)")
-                                seccion_debito_ext = st.text_input("Sección Débito ext. (asiento)", value=emp.get('seccion_debito_externo', '') or '', key=f"emp_sde_{emp_id}", help="Ej: FABRICA — sección donde se debita la acred. banco de este empleado")
+
+                            # ══ CONTABILIDAD ══
+                            st.markdown('<div class="section-hdr sh-contab">📊 Contabilidad</div>', unsafe_allow_html=True)
+                            ct1, ct2 = st.columns(2)
+                            with ct1:
+                                codigo_contable = st.text_input("Código Contable", value=emp.get('codigo_contable', '') or '', key=f"emp_cc_{emp_id}", help="Ej: 1.1.070.10.006")
+                            with ct2:
+                                seccion_debito_ext = st.text_input("Sección Débito ext.", value=emp.get('seccion_debito_externo', '') or '', key=f"emp_sde_{emp_id}", help="Ej: FABRICA")
+
+                            observaciones = st.text_area("Observaciones", value=emp.get('observaciones', ''), key=f"emp_obs_{emp_id}", height=60)
 
                             st.markdown("---")
-                            confirmar_guardado = st.checkbox("⚠️ Confirmo que deseo aplicar estos cambios permanentemente", value=False, disabled=not desbloqueado, key=f"emp_conf_{emp_id}")
+                            confirmar_guardado = st.checkbox("⚠️ Confirmo que deseo aplicar estos cambios", value=False, key=f"emp_conf_{emp_id}")
 
-                            submitted = st.form_submit_button("💾 Guardar cambios", disabled=not desbloqueado)
-                            
+                            submitted = st.form_submit_button("💾 Guardar cambios")
+
                             if submitted:
                                 if not confirmar_guardado:
                                     st.error("❌ Debes marcar la casilla de confirmación para poder guardar.")
@@ -809,99 +985,140 @@ with tab_admin:
                                         'codigo_contable': codigo_contable,
                                         'seccion_debito_externo': seccion_debito_ext,
                                     })
+                                    st.session_state.msg_edit_emp = f"Empleado {nombre} actualizado correctamente."
+                                    # Limpiar selección para nueva búsqueda
+                                    old_key = f'emp_picked_{st.session_state.sel_emp_key_cnt}'
+                                    if old_key in st.session_state:
+                                        del st.session_state[old_key]
                                     st.session_state.sel_emp_key_cnt += 1
+                                    if 'busq_emp_edit' in st.session_state:
+                                        del st.session_state['busq_emp_edit']
                                     st.rerun()
 
                         # Zona de Peligro: Eliminar Empleado
-                        for _ in range(3): st.write("") # Espacio
-                        with st.expander("⚠️ ZONA DE PELIGRO: Eliminar Empleado"):
-                            st.error(f"Esta acción eliminará PERMANENTEMENTE a **{emp['apellido_nombre']}** y TODO su historial de liquidaciones.")
-                            conf_borrar = st.checkbox(f"Confirmo que deseo eliminar a {emp['apellido_nombre']} definitivamente", key=f"del_conf_{emp_id}")
-                            if st.button("🗑️ Eliminar Empleado Permanentemente", type="secondary", disabled=not conf_borrar, key=f"btn_del_{emp_id}", use_container_width=True):
+                        for _ in range(2): st.write("")
+                        with st.expander("🔴 ZONA DE PELIGRO: Eliminar Empleado", expanded=False):
+                            st.error(f"Esta acción eliminará PERMANENTEMENTE a **{emp['apellido_nombre']}** y TODO su historial de liquidaciones. **No se puede deshacer.**")
+                            conf_borrar_1 = st.checkbox(f"Confirmo que deseo eliminar a {emp['apellido_nombre']}", key=f"del_conf1_{emp_id}")
+                            conf_borrar_2 = False
+                            if conf_borrar_1:
+                                st.warning("⚠️ **Segunda confirmación:** ¿Estás SEGURO? Se perderán todos los recibos y liquidaciones asociadas.")
+                                conf_borrar_2 = st.checkbox("Sí, estoy seguro. Eliminar definitivamente.", key=f"del_conf2_{emp_id}")
+                            btn_del_disabled = not (conf_borrar_1 and conf_borrar_2)
+                            if st.button("🗑️ Eliminar Empleado Permanentemente", type="primary", disabled=btn_del_disabled, key=f"btn_del_{emp_id}", use_container_width=True):
                                 db.eliminar_empleado(emp_id)
                                 st.session_state.mensaje_exito = f"✅ El empleado {emp['apellido_nombre']} ha sido eliminado de la nómina."
+                                old_key = f'emp_picked_{st.session_state.sel_emp_key_cnt}'
+                                if old_key in st.session_state:
+                                    del st.session_state[old_key]
                                 st.session_state.sel_emp_key_cnt += 1
+                                if 'busq_emp_edit' in st.session_state:
+                                    del st.session_state['busq_emp_edit']
                                 st.rerun()
 
-            else:
+            with tab_crear:
                 if 'msg_crear_emp' in st.session_state:
                     st.success(st.session_state.msg_crear_emp)
                     del st.session_state.msg_crear_emp
 
-                # Crear nuevo
+                # Crear nuevo — campos esenciales visibles, avanzados en expander
                 with st.form("form_crear_emp", clear_on_submit=True):
-                    col1, col2 = st.columns(2)
-                    with col1:
+                    st.markdown('<div class="section-hdr sh-personal">👤 Datos Básicos</div>', unsafe_allow_html=True)
+                    cn1, cn2, cn3 = st.columns([3, 2, 2])
+                    with cn1:
                         nombre = st.text_input("Apellido y Nombre", key="new_emp_nom")
+                    with cn2:
                         cuil = st.text_input("CUIL", key="new_emp_cuil")
-                        
-                        c_ntp1, c_ntp2 = st.columns(2)
-                        with c_ntp1:
-                            condicion = st.selectbox("Condición", ["PERMANENTE", "EVENTUAL"], key="new_emp_cond")
-                        with c_ntp2:
-                            tipo = st.selectbox("Tipo", ["JORNAL", "MENSUALIZADO"], key="new_emp_tipo")
-                        
-                        seccion = st.text_input("Sección", key="new_emp_sec")
-                        cats_conv = [c['nombre'] for c in db.get_categorias()]
-                        convenio = st.radio("Convenio", ["Bajo Convenio", "Fuera de Convenio"], horizontal=True, key="new_emp_conv")
-                        fuera_conv = 1 if convenio == "Fuera de Convenio" else 0
-
-                        c_cat1, c_cat2 = st.columns([1, 1])
-                        with c_cat1:
-                            categoria = st.selectbox("Categoría", cats_conv if cats_conv else ["Sin categorías"], key="new_emp_cat")
-                        with c_cat2:
-                            val_cat_db = db.get_valor_categoria(categoria, datetime.now().month, datetime.now().year)
-                            db_val = 0.0
-                            if val_cat_db:
-                                db_val = val_cat_db['valor_hora'] if tipo in ["JORNAL", "EVENTUAL"] else val_cat_db['valor_mensual']
-                            
-                            label_val = "Valor Hora" if tipo in ["JORNAL", "EVENTUAL"] else "Sueldo Básico"
-                            
-                            # Siempre permitir edición en creación para evitar confusión
-                            sueldo_base = st.number_input(label_val, value=db_val, key="new_emp_sb")
-                            estado = st.selectbox("Estado", ["ACTIVO", "INACTIVO"], key="new_emp_est")
-                    with col2:
-                        fecha_ing_str_new = st.text_input("Fecha de ingreso (DD/MM/AAAA)", value=date.today().strftime('%d/%m/%Y'), key="new_emp_fi")
+                    with cn3:
+                        fecha_ing_str_new = st.text_input("F. Ingreso (DD/MM/AAAA)", value=date.today().strftime('%d/%m/%Y'), key="new_emp_fi")
                         try:
                             fecha_ing = datetime.strptime(fecha_ing_str_new, '%d/%m/%Y').date()
                         except:
                             fecha_ing = date.today()
-                        liq_mensual = st.checkbox("¿Liquida mensual?", key="new_emp_lm")
-                        liq_ant_bas = st.checkbox("¿Liquida antigüedad sobre básico?", key="new_emp_lab")
-                        liq_present = st.checkbox("¿Liquida presentismo?", value=True, key="new_emp_lp")
-                        pct_pres = st.number_input("Porcentaje Presentismo (%)", value=15.0, step=0.01, format="%.2f", key="new_emp_pp_pct")
-                        dif_sueldo = st.number_input("Diferencia de sueldo", value=0.0, key="new_emp_ds")
-                        premio = st.number_input("Premio producción", value=0.0, key="new_emp_pp")
-                        desc_premio = st.number_input("DESC.PREM.PROD.", value=0.0, key="new_emp_dpp")
-                        cifra_fija = st.number_input("Cifra Fija", value=0.0, key="new_emp_cf")
+
+                    st.markdown('<div class="section-hdr sh-laboral">🏢 Datos Laborales</div>', unsafe_allow_html=True)
+                    nl1, nl2, nl3, nl4 = st.columns(4)
+                    with nl1:
+                        condicion = st.selectbox("Condición", ["PERMANENTE", "EVENTUAL"], key="new_emp_cond")
+                    with nl2:
+                        tipo = st.selectbox("Tipo", ["JORNAL", "MENSUALIZADO"], key="new_emp_tipo")
+                    with nl3:
+                        seccion = st.text_input("Sección", key="new_emp_sec")
+                    with nl4:
+                        estado = st.selectbox("Estado", ["ACTIVO", "INACTIVO"], key="new_emp_est")
+
+                    cats_conv = [c['nombre'] for c in db.get_categorias()]
+                    convenio = st.radio("Convenio", ["Bajo Convenio", "Fuera de Convenio"], horizontal=True, key="new_emp_conv")
+                    fuera_conv = 1 if convenio == "Fuera de Convenio" else 0
+
+                    nc1, nc2 = st.columns(2)
+                    with nc1:
+                        categoria = st.selectbox("Categoría", cats_conv if cats_conv else ["Sin categorías"], key="new_emp_cat")
+                    with nc2:
+                        val_cat_db = db.get_valor_categoria(categoria, datetime.now().month, datetime.now().year)
+                        db_val = 0.0
+                        if val_cat_db:
+                            db_val = val_cat_db['valor_hora'] if tipo in ["JORNAL", "EVENTUAL"] else val_cat_db['valor_mensual']
+                        label_val = "Valor Hora" if tipo in ["JORNAL", "EVENTUAL"] else "Sueldo Básico"
+                        sueldo_base = st.number_input(label_val, value=db_val, key="new_emp_sb")
+
+                    st.markdown('<div class="section-hdr sh-liquidacion">⚙️ Liquidación</div>', unsafe_allow_html=True)
+                    nq1, nq2, nq3, nq4 = st.columns(4)
+                    with nq1:
+                        liq_mensual = st.checkbox("Liquida mensual", key="new_emp_lm")
+                    with nq2:
+                        liq_ant_bas = st.checkbox("Antig. s/básico", key="new_emp_lab")
+                    with nq3:
+                        liq_present = st.checkbox("Presentismo", value=True, key="new_emp_lp")
+                    with nq4:
+                        pct_pres = st.number_input("% Present.", value=15.0, step=0.01, format="%.2f", key="new_emp_pp_pct")
+
+                    if liq_mensual:
+                        ndm1, ndm2 = st.columns(2)
+                        with ndm1:
+                            dias_liq_mensual = st.selectbox("Días a liquidar", list(range(1, 31)), index=29, key="new_emp_dlm")
+                        with ndm2:
+                            dias_perm = st.checkbox("¿Permanente?", value=True, key="new_emp_dms_p")
+                    else:
+                        dias_liq_mensual = 30
+                        dias_perm = 1
+
+                    # ── Campos avanzados en expander ──
+                    with st.expander("➕ Conceptos variables, descuentos y contabilidad", expanded=False):
+                        st.markdown('<div class="section-hdr sh-conceptos">💰 Conceptos Variables</div>', unsafe_allow_html=True)
+                        nv1, nv2, nv3, nv4 = st.columns(4)
+                        with nv1:
+                            dif_sueldo = st.number_input("Dif. Sueldo", value=0.0, key="new_emp_ds")
+                        with nv2:
+                            premio = st.number_input("Premio Prod.", value=0.0, key="new_emp_pp")
+                        with nv3:
+                            desc_premio = st.number_input("Desc. Premio", value=0.0, key="new_emp_dpp")
+                        with nv4:
+                            cifra_fija = st.number_input("Cifra Fija", value=0.0, key="new_emp_cf")
                         cobra_cifra_fija_new = st.checkbox("¿Cobra Cifra Fija?", value=False, key="new_emp_ccf")
-                        
-                        st.markdown("---")
-                        c_nadd_row1, c_nadd_row2 = st.columns(2)
-                        with c_nadd_row1:
+
+                        st.markdown('<div class="section-hdr sh-descuentos">📋 Descuentos y Adicionales</div>', unsafe_allow_html=True)
+                        na1, na2, na3 = st.columns(3)
+                        with na1:
                             anticipos = st.number_input("Anticipos", value=0.0, key="new_emp_ant")
-                        with c_nadd_row2:
-                            acred_banco = st.number_input("Acreditación Banco", value=0.0, key="new_emp_ab")
-                        otros = st.number_input("Otros (+/-)", value=0.0, key="new_emp_otr")
-                        
-                        if liq_mensual:
-                            c_ndms1, c_ndms2 = st.columns(2)
-                            with c_ndms1:
-                                dias_liq_mensual = st.selectbox("Días a liquidar", list(range(1, 31)), index=29, key="new_emp_dlm")
-                            with c_ndms2:
-                                dias_perm = st.checkbox("¿Permanente?", value=True, key="new_emp_dms_p")
-                        else:
-                            dias_liq_mensual = 30
-                            dias_perm = 1
+                        with na2:
+                            acred_banco = st.number_input("Acred. Banco", value=0.0, key="new_emp_ab")
+                        with na3:
+                            otros = st.number_input("Otros (+/-)", value=0.0, key="new_emp_otr")
 
-                        observaciones = st.text_area("Observaciones", key="new_emp_obs", height=80)
+                        nj1, nj2, nj3, nj4 = st.columns(4)
+                        with nj1:
+                            jubilacion = st.number_input("Jubilación", value=0.0, key="new_emp_jub")
+                        with nj2:
+                            obra_social = st.number_input("Obra Social", value=0.0, key="new_emp_os")
+                        with nj3:
+                            seguro = st.number_input("Seguro", value=0.0, key="new_emp_seg")
+                        with nj4:
+                            hs_fijas = st.number_input("HS Fijas", value=0.0, key="new_emp_hf")
 
-                        jubilacion = st.number_input("Jubilación", value=0.0, key="new_emp_jub")
-                        obra_social = st.number_input("Obra Social", value=0.0, key="new_emp_os")
-                        seguro = st.number_input("Seguro", value=0.0, key="new_emp_seg")
-                        hs_fijas = st.number_input("HS Fijas por periodo", value=0.0, key="new_emp_hf")
+                    observaciones = st.text_area("Observaciones", key="new_emp_obs", height=60)
 
-                    if st.form_submit_button("➕ Crear empleado"):
+                    if st.form_submit_button("➕ Crear empleado", use_container_width=True):
                         if nombre:
                             db.crear_empleado({
                                 'apellido_nombre': nombre,
@@ -1083,11 +1300,29 @@ with tab_admin:
                         key=f"dl_xl_{label_tipo}"
                     )
 
+            def _style_emp_table(df_vista):
+                """Aplica color de fondo por estado y badge FC/BC."""
+                df_styled = _fmt_df(df_vista)
+                def _row_color(row):
+                    estado = str(row.get('estado', '')).upper()
+                    conv = str(row.get('conv', '')).upper()
+                    if estado == 'INACTIVO':
+                        bg = 'background-color: rgba(239,68,68,0.10)'
+                    else:
+                        bg = 'background-color: rgba(34,197,94,0.08)'
+                    styles = [bg] * len(row)
+                    # Resaltar celda Conv si es FC
+                    if 'conv' in row.index and conv == 'FC':
+                        ci = list(row.index).index('conv')
+                        styles[ci] = 'background-color: rgba(99,102,241,0.18); font-weight: bold'
+                    return styles
+                return df_styled.style.apply(_row_color, axis=1)
+
             if st.session_state.vista_personal == 'perm':
                 st.markdown(f"**{len(df_perm)} permanentes**")
                 if not df_perm.empty:
                     st.dataframe(
-                        _fmt_df(df_perm[cols_existentes]),
+                        _style_emp_table(df_perm[cols_existentes]),
                         use_container_width=True,
                         hide_index=True,
                         column_config=_col_cfg
@@ -1099,7 +1334,7 @@ with tab_admin:
                 st.markdown(f"**{len(df_event)} eventuales**")
                 if not df_event.empty:
                     st.dataframe(
-                        _fmt_df(df_event[cols_existentes]),
+                        _style_emp_table(df_event[cols_existentes]),
                         use_container_width=True,
                         hide_index=True,
                         column_config=_col_cfg
