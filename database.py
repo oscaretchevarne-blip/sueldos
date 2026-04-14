@@ -1044,6 +1044,21 @@ def eliminar_liquidaciones_multiples(periodo_id, empleado_ids):
     conn.close()
 
 
+def eliminar_todas_liquidaciones_periodo(periodo_id):
+    """Elimina TODAS las liquidaciones de un período, sin filtrar por empleado.
+    Se usa para el borrado masivo ('Toda la Nómina') así también alcanza a
+    liquidaciones de empleados que fueron dados de baja durante el período y
+    que de otro modo quedarían huérfanas.
+    Retorna la cantidad de filas eliminadas.
+    """
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM liquidaciones WHERE periodo_id = ?", (periodo_id,))
+    n = cur.rowcount
+    conn.commit()
+    conn.close()
+    return n
+
+
 def get_historial_empleado(empleado_id):
     """Obtiene el historial de liquidaciones de un empleado."""
     conn = get_connection()

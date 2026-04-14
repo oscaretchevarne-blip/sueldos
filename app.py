@@ -1160,13 +1160,35 @@ with tab_admin:
             df_emp = pd.DataFrame(emp_filtrados)
             if not df_emp.empty and 'fecha_ingreso' in df_emp.columns:
                 def _fmt_date(d):
-                    if not d: return ''
-                    for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
+                    # Nulos / vacíos
+                    if d is None:
+                        return ''
+                    try:
+                        if pd.isna(d):
+                            return ''
+                    except (TypeError, ValueError):
+                        pass
+                    # Ya es date/datetime → formatear directo
+                    if isinstance(d, (datetime, date)):
+                        return d.strftime('%d/%m/%Y')
+                    # Timestamp de pandas
+                    if hasattr(d, 'strftime'):
                         try:
-                            return datetime.strptime(d, fmt).strftime('%d/%m/%Y')
-                        except ValueError:
-                            continue
-                    return d
+                            return d.strftime('%d/%m/%Y')
+                        except Exception:
+                            pass
+                    # String: probar formatos conocidos
+                    if isinstance(d, str):
+                        if not d.strip():
+                            return ''
+                        for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%Y-%m-%d %H:%M:%S'):
+                            try:
+                                return datetime.strptime(d, fmt).strftime('%d/%m/%Y')
+                            except ValueError:
+                                continue
+                        return d
+                    # Cualquier otro tipo: devolver su repr str
+                    return str(d)
                 df_emp['fecha_ingreso'] = df_emp['fecha_ingreso'].apply(_fmt_date)
 
             # Agregar columnas de valor básico/hora y flags SI/NO
@@ -2031,12 +2053,17 @@ with tab_liq:
                 conf_del = st.checkbox("Confirmo que deseo borrar las liquidaciones seleccionadas", key="conf_del_masivo")
                 if st.button("🗑️ Eliminar Liquidaciones en Lote", type="secondary", disabled=not conf_del, use_container_width=True):
                     if alcance_del == "Toda la Nómina":
-                        emps_ids = [e['id'] for e in empleados_activos]
+                        # Borrar TODAS las liquidaciones del período, incluyendo las de
+                        # empleados dados de baja durante el mes (que no estan en empleados_activos).
+                        n_borradas = db.eliminar_todas_liquidaciones_periodo(periodo_id)
+                        st.session_state.msg_liq = f"✅ Se han eliminado {n_borradas} liquidaciones del período correctamente."
                     else:
-                        emps_ids = [e['id'] for e in empleados_activos if e['seccion'] == sector_del]
-                    
-                    db.eliminar_liquidaciones_multiples(periodo_id, emps_ids)
-                    st.session_state.msg_liq = f"✅ Se han eliminado las liquidaciones para {len(emps_ids)} empleados correctamente."
+                        # Por Sector: incluir tambien empleados inactivos cuya seccion coincida,
+                        # para cubrir el caso de bajas en el mes.
+                        todos_emp = db.get_empleados()
+                        emps_ids = [e['id'] for e in todos_emp if e.get('seccion') == sector_del]
+                        db.eliminar_liquidaciones_multiples(periodo_id, emps_ids)
+                        st.session_state.msg_liq = f"✅ Se han eliminado las liquidaciones del sector {sector_del} ({len(emps_ids)} empleados alcanzados)."
                     st.rerun()
     
     # Boton de impresion masiva (fuera del expander de herramientas si ya hay liquidaciones)
