@@ -26,269 +26,469 @@ def _safe_pdf_output(pdf):
     return bytes(raw)
 
 
+# ──────────────────────────────────────────────
+# IMPORTE EN LETRAS (para "Son pesos:" en recibo)
+# ──────────────────────────────────────────────
+
+_UNIDADES_TXT = ['','UNO','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ',
+                 'ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISEIS','DIECISIETE','DIECIOCHO','DIECINUEVE','VEINTE']
+_DECENAS_TXT = ['','','VEINTI','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA']
+_CENTENAS_TXT = ['','CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS',
+                 'SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS']
+
+def _menor_mil_txt(n):
+    if n == 0: return ''
+    if n == 100: return 'CIEN'
+    c = n // 100; resto = n % 100
+    res = _CENTENAS_TXT[c] if c else ''
+    if resto == 0: return res.strip()
+    if resto <= 20:
+        pal = _UNIDADES_TXT[resto]
+    else:
+        d = resto // 10; u = resto % 10
+        if d == 2:
+            pal = 'VEINTI' + _UNIDADES_TXT[u] if u else 'VEINTE'
+        else:
+            pal = _DECENAS_TXT[d] + (' Y ' + _UNIDADES_TXT[u] if u else '')
+    return (res + ' ' + pal).strip()
+
+def _numero_a_letras(n):
+    """Convierte un entero a su representacion en letras (para 'Son pesos:')."""
+    try:
+        n = int(round(float(n)))
+    except Exception:
+        return ''
+    if n < 0:
+        return 'MENOS ' + _numero_a_letras(-n)
+    if n == 0: return 'CERO'
+    millones = n // 1_000_000
+    miles = (n % 1_000_000) // 1000
+    unidades = n % 1000
+    partes = []
+    if millones:
+        partes.append('UN MILLON' if millones == 1 else _menor_mil_txt(millones) + ' MILLONES')
+    if miles:
+        partes.append('MIL' if miles == 1 else _menor_mil_txt(miles) + ' MIL')
+    if unidades:
+        partes.append(_menor_mil_txt(unidades))
+    return ' '.join(partes)
+
+
 class ReciboPDF(FPDF):
-    """Genera recibos de sueldo en formato A5 horizontal (210 x 148 mm) - Diseno ultra-compacto."""
+    """Genera recibos de sueldo en formato A5 horizontal (210 x 148 mm).
+    Layout profesional: haberes y deducciones en columnas separadas, ficha de
+    empleado en grilla, caja destacada de NETO A COBRAR y firma unica del empleado.
+    """
+
+    # Paleta
+    SLATE_DARK    = (30, 41, 59)
+    SLATE_MID     = (51, 65, 85)
+    SLATE_SOFT    = (241, 245, 249)
+    SLATE_LINE    = (203, 213, 225)
+    TEXT_MUTED    = (100, 116, 139)
+    ACCENT_BG     = (236, 242, 248)
+    SUBTOTAL_BG   = (226, 232, 240)
 
     def __init__(self):
-        # Usar tamaño A4 estándar pero solo dibujaremos en la mitad superior (primeros 148.5mm)
-        # Esto asegura que la impresora detecte una hoja normal y no rote el contenido.
+        # A4 vertical, pero se dibuja solo en los primeros 148mm (area A5 horizontal).
         super().__init__(orientation='P', unit='mm', format='A4')
         self.set_auto_page_break(auto=False)
 
     def _fill_rect(self, x, y, w, h, r, g, b):
-        """Dibuja un rectangulo con relleno de color."""
         self.set_fill_color(r, g, b)
+        self.rect(x, y, w, h, 'F')
+
+    def _fill(self, x, y, w, h, rgb):
+        self.set_fill_color(*rgb)
         self.rect(x, y, w, h, 'F')
 
     def generar_recibo(self, liquidacion, empleado, periodo):
         """Genera una pagina de recibo A5 horizontal para un empleado."""
         self.add_page()
 
-        # Dimensiones: 210mm ancho x 148mm alto
         page_w = 210
         page_h = 148
-        ml = 10      # margen lateral 1cm
-        mr = 10
-        mt = 5       # margen superior 0.5cm
-        aw = page_w - ml - mr  # ancho util = 190mm
+        ml, mr, mt = 8, 8, 5
+        aw = page_w - ml - mr  # 194
 
         y = mt
         liq = liquidacion
 
-        # ENCABEZADO - Compacto
-        header_h = 11
-        self._fill_rect(ml, y, aw, header_h, 30, 41, 59) # Slate 800ish
+        # ══════════════════════════════════════════
+        # 1. ENCABEZADO
+        # ══════════════════════════════════════════
+        header_h = 13
+        self._fill(ml, y, aw, header_h, self.SLATE_DARK)
 
         self.set_text_color(255, 255, 255)
-        self.set_font('Helvetica', 'B', 10)
-        self.set_xy(ml, y + 1)
-        self.cell(aw, 5, 'INGENIERIA PLASTICA ROSARIO S.A.', 0, 1, 'C')
-        
+        self.set_font('Helvetica', 'B', 12)
+        self.set_xy(ml + 2, y + 1.5)
+        self.cell(aw - 4, 5, 'INGENIERIA  PLASTICA  ROSARIO  S.A.', 0, 1, 'C')
+
         self.set_font('Helvetica', '', 7.5)
-        self.set_xy(ml, y + 5.5)
-        self.cell(aw, 4, 'CUIT: 30-54897809-9  |  Lugar de pago: V.G. GALVEZ', 0, 1, 'C')
-        
-        self.set_font('Helvetica', 'B', 7)
-        self.set_xy(ml, y + 8.5)
-        self.cell(aw, 3, 'RECIBO DE HABERES - Segun Ley de Contrato de Trabajo', 0, 1, 'C')
+        self.set_xy(ml + 2, y + 6.5)
+        self.cell(aw - 4, 3.5, 'CUIT: 30-54897809-9    -    Lugar de pago: V.G. GALVEZ', 0, 1, 'C')
+
+        # Sub-banda dentro del header
+        self._fill(ml, y + header_h - 3, aw, 3, self.SLATE_MID)
+        self.set_font('Helvetica', 'B', 6.5)
+        self.set_xy(ml + 2, y + header_h - 3)
+        self.cell((aw - 4) / 2, 3, 'RECIBO DE HABERES   -   LCT Art. 138 a 146', 0, 0, 'L')
+        nro_rec = liq.get('nro_recibo', '') or ''
+        self.set_xy(ml + aw / 2, y + header_h - 3)
+        self.cell((aw - 4) / 2, 3, (f'N  {nro_rec}' if nro_rec else ''), 0, 1, 'R')
 
         self.set_text_color(0, 0, 0)
-        y += header_h + 1
+        y += header_h + 2
 
-        # PERIODO
-        q = periodo.get('quincena', '')
-        m_per = periodo.get('mes', '')
-        a_per = periodo.get('anio', '')
-        periodo_str = f"{q:02d}/{m_per:02d}/{str(a_per)[2:]}"
-        meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-        mes_nombre = meses[int(m_per)] if 1 <= int(m_per) <= 12 else ''
-        quincena_txt = '1ra' if q == 1 else '2da'
+        # ══════════════════════════════════════════
+        # 2. FICHA EMPLEADO + PERIODO
+        # ══════════════════════════════════════════
+        ficha_h = 20
+        ficha_w = aw - 50    # 144
+        per_w = 48           # tag periodo a la derecha
 
-        per_h = 5
-        self._fill_rect(ml, y, aw, per_h, 241, 245, 249)
-        self.set_font('Helvetica', 'B', 8)
-        self.set_xy(ml, y)
-        self.cell(aw, per_h, f'PERIODO: {quincena_txt} Quincena de {_ascii(mes_nombre)} {a_per} ({periodo_str})', 0, 1, 'C')
-        y += per_h + 1
+        self.set_draw_color(*self.SLATE_LINE)
+        self.rect(ml, y, ficha_w, ficha_h)
 
-        # DATOS DEL EMPLEADO - Dos columnas
-        self.set_draw_color(226, 232, 240)
-        datos_h = 14
-        self.rect(ml, y, aw, datos_h)
+        nombre   = _ascii(empleado.get('apellido_nombre', '') or '')
+        cuil     = empleado.get('cuil', '') or ''
+        fi       = empleado.get('fecha_ingreso', '') or ''
+        ant_pct  = liq.get('porcentaje_antiguedad', 0)
+        anos_ant = liq.get('anos_antiguedad', '') or ''
+        cat      = _ascii(empleado.get('categoria', '') or '')
+        sec      = _ascii(empleado.get('seccion', '') or '')
+        tipo     = empleado.get('tipo', '') or ''
+        vh       = liq.get('valor_hora_usado', 0)
+        vm       = liq.get('valor_mensual_usado', 0)
 
-        nombre = _ascii(empleado.get('apellido_nombre', ''))
-        cuil = empleado.get('cuil', '') or ''
-        fi = empleado.get('fecha_ingreso', '') or ''
-        cat = _ascii(empleado.get('categoria', '') or '')
-        tipo = empleado.get('tipo', '')
-        seccion = _ascii(empleado.get('seccion', '') or '')
-        hoy_str = datetime.now().strftime('%d/%m/%Y')
-
-        # Columna 1
-        self.set_font('Helvetica', 'B', 10)
-        self.set_xy(ml + 2, y + 1)
-        self.cell(aw - 4, 5, f'{nombre} | CUIL: {cuil}', 0, 1)
-
-        self.set_font('Helvetica', '', 8)
-        self.set_xy(ml + 2, y + 6)
-        self.cell(aw*0.5, 4, f'CATEGORIA: {cat}', 0, 0)
-        self.cell(aw*0.5 - 4, 4, f'TIPO: {tipo}', 0, 1, 'R')
-        
+        # Normalizar fecha de ingreso a dd/mm/yyyy
         if fi:
-            try:
-                # Intentar varios formatos si viene de la DB en ISO
-                for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
-                    try:
-                        fi_dt = datetime.strptime(fi, fmt)
-                        fi = fi_dt.strftime('%d/%m/%Y')
-                        break
-                    except ValueError:
-                        continue
-            except:
-                pass
-        self.cell(aw*0.25, 4, f'INGRESO: {fi}', 0, 0)
-        self.cell(aw*0.25, 4, f'SECCION: {seccion}', 0, 0)
-        
-        vh = liq.get('valor_hora_usado', 0)
-        vm = liq.get('valor_mensual_usado', 0)
-        val_str = f"$ {_fmt_ar(vh)}" if vh > 0 else (f"$ {_fmt_ar(vm)}" if vm > 0 else "")
-        label_val = "VALOR HORA:" if vh > 0 else "VALOR MENSUAL:"
-        self.cell(aw*0.25, 4, f'{label_val} {val_str}', 0, 0)
-        
-        ant = liq.get('porcentaje_antiguedad', 0)
-        self.cell(aw*0.25 - 4, 4, f'ANTIGUEDAD: {ant}%', 0, 1, 'R')
+            for _fmt in ('%Y-%m-%d', '%d/%m/%Y'):
+                try:
+                    fi = datetime.strptime(fi, _fmt).strftime('%d/%m/%Y')
+                    break
+                except ValueError:
+                    continue
 
-        y += datos_h + 1
+        # Linea 1: APELLIDO Y NOMBRE
+        self.set_text_color(*self.TEXT_MUTED)
+        self.set_font('Helvetica', '', 5.5)
+        self.set_xy(ml + 2, y + 1.2)
+        self.cell(ficha_w - 4, 2.5, 'APELLIDO Y NOMBRE', 0, 1, 'L')
+        self.set_text_color(0, 0, 0)
+        self.set_font('Helvetica', 'B', 11)
+        self.set_xy(ml + 2, y + 3.5)
+        self.cell(ficha_w - 4, 5, nombre, 0, 1, 'L')
 
-        # TABLA DE CONCEPTOS
-        cant_w = 25
-        imp_w = 45
-        conc_w = aw - cant_w - imp_w
+        # separador
+        self.set_draw_color(*self.SLATE_LINE)
+        self.line(ml + 2, y + 9.5, ml + ficha_w - 2, y + 9.5)
 
-        # Cabecera
-        self._fill_rect(ml, y, aw, 5, 51, 65, 85)
+        # Fila 2: CUIL | FECHA INGRESO | ANTIGUEDAD | VALOR HORA/MENSUAL
+        col_w = (ficha_w - 4) / 4
+        val_str = f'$ {_fmt_ar(vh)}' if vh > 0 else (f'$ {_fmt_ar(vm)}' if vm > 0 else '')
+        lbl_val = 'VALOR HORA' if vh > 0 else 'VALOR MENSUAL'
+        ant_txt = f'{anos_ant} ({ant_pct}%)' if anos_ant else f'{ant_pct}%'
+        labels1 = ['CUIL', 'FECHA DE INGRESO', 'ANTIGUEDAD', lbl_val]
+        values1 = [cuil, fi, ant_txt, val_str]
+        for i, (lb, vl) in enumerate(zip(labels1, values1)):
+            x = ml + 2 + i * col_w
+            self.set_text_color(*self.TEXT_MUTED)
+            self.set_font('Helvetica', '', 5.5)
+            self.set_xy(x, y + 10.3)
+            self.cell(col_w, 2.5, lb, 0, 0, 'L')
+            self.set_text_color(0, 0, 0)
+            self.set_font('Helvetica', 'B', 8)
+            self.set_xy(x, y + 12.8)
+            self.cell(col_w, 3.5, _ascii(str(vl)), 0, 0, 'L')
+
+        # Fila 3: CATEGORIA | SECCION | TIPO
+        col_w3 = (ficha_w - 4) / 3
+        labels2 = ['CATEGORIA', 'SECCION', 'TIPO']
+        values2 = [cat, sec, tipo]
+        for i, (lb, vl) in enumerate(zip(labels2, values2)):
+            x = ml + 2 + i * col_w3
+            self.set_text_color(*self.TEXT_MUTED)
+            self.set_font('Helvetica', '', 5.5)
+            self.set_xy(x, y + 16)
+            self.cell(col_w3, 2.5, lb, 0, 0, 'L')
+            self.set_text_color(0, 0, 0)
+            self.set_font('Helvetica', 'B', 8)
+            self.set_xy(x, y + 17.8)
+            self.cell(col_w3, 2.5, _ascii(str(vl)), 0, 0, 'L')
+
+        # Tag de PERIODO a la derecha
+        per_x = ml + ficha_w + 2
+        self._fill(per_x, y, per_w, ficha_h, self.SLATE_DARK)
         self.set_text_color(255, 255, 255)
+        self.set_font('Helvetica', '', 6)
+        self.set_xy(per_x, y + 1.5)
+        self.cell(per_w, 3, 'PERIODO LIQUIDADO', 0, 1, 'C')
+
+        q = periodo.get('quincena', 1)
+        mp = periodo.get('mes', 1)
+        ap = periodo.get('anio', 0)
+        meses = ['', 'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+                 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
+        try:
+            mes_nombre = meses[int(mp)]
+        except Exception:
+            mes_nombre = ''
+        q_txt = '1ra  QUINCENA' if q == 1 else '2da  QUINCENA'
+        self.set_font('Helvetica', 'B', 9)
+        self.set_xy(per_x, y + 5)
+        self.cell(per_w, 5, q_txt, 0, 1, 'C')
+        self.set_font('Helvetica', 'B', 10)
+        self.set_xy(per_x, y + 10)
+        self.cell(per_w, 5, f'{mes_nombre}  {ap}', 0, 1, 'C')
+        self.set_font('Helvetica', '', 7)
+        self.set_xy(per_x, y + 15)
+        try:
+            periodo_str = f'{int(q):02d}/{int(mp):02d}/{str(ap)[2:]}'
+        except Exception:
+            periodo_str = ''
+        self.cell(per_w, 4, periodo_str, 0, 1, 'C')
+
+        self.set_text_color(0, 0, 0)
+        y += ficha_h + 2
+
+        # ══════════════════════════════════════════
+        # 3. TABLA DE CONCEPTOS (Haberes / Deducciones separadas)
+        # ══════════════════════════════════════════
+        conc_w = 78
+        cant_w = 22
+        pct_w  = 14
+        hab_w  = 35
+        ded_w  = aw - conc_w - cant_w - pct_w - hab_w
+
+        head_h = 5.5
+        self._fill(ml, y, aw, head_h, self.SLATE_MID)
+        self.set_text_color(255, 255, 255)
+        self.set_font('Helvetica', 'B', 7)
+        self.set_xy(ml, y)
+        self.cell(conc_w, head_h, '  CONCEPTO', 0, 0, 'L')
+        self.cell(cant_w, head_h, 'CANT. / REF.', 0, 0, 'C')
+        self.cell(pct_w,  head_h, '%', 0, 0, 'C')
+        self.cell(hab_w,  head_h, 'HABERES', 0, 0, 'R')
+        self.cell(ded_w,  head_h, 'DEDUCCIONES  ', 0, 1, 'R')
+        self.set_text_color(0, 0, 0)
+        y += head_h
+
+        row_h = 3.9
+        y_ref = [y]
+        row_i = [0]
+
+        def fila(concepto, cant='', pct='', haberes=0, deducciones=0):
+            cy = y_ref[0]
+            if row_i[0] % 2 == 1:
+                self._fill(ml, cy, aw, row_h, self.SLATE_SOFT)
+            self.set_font('Helvetica', '', 7.8)
+            self.set_xy(ml, cy)
+            self.cell(conc_w, row_h, '  ' + _ascii(concepto), 0, 0, 'L')
+            # cantidad: numero o string
+            if isinstance(cant, (int, float)) and cant != 0:
+                c_str = f"{cant:.1f}" if isinstance(cant, float) else str(cant)
+            else:
+                c_str = str(cant) if cant not in (None, '', 0) else ''
+            self.cell(cant_w, row_h, c_str, 0, 0, 'C')
+            p_str = ''
+            if pct not in (None, '', 0):
+                try:
+                    pf = float(pct)
+                    p_str = f'{int(pf)}%' if pf == int(pf) else f'{pf}%'
+                except Exception:
+                    p_str = f'{pct}%'
+            self.cell(pct_w, row_h, p_str, 0, 0, 'C')
+            self.cell(hab_w, row_h, (_fmt_ar(haberes) if haberes else ''), 0, 0, 'R')
+            self.cell(ded_w, row_h, ((_fmt_ar(deducciones) + '  ') if deducciones else ''), 0, 1, 'R')
+            y_ref[0] += row_h
+            row_i[0] += 1
+
+        # ── HABERES ──
+        if liq.get('importe_basico_mensual', 0) > 0:
+            fila('DS. MENSUALES', liq.get('dias_trabajados', 0), '', haberes=liq['importe_basico_mensual'])
+        if liq.get('horas_comunes', 0) > 0:
+            fila('HS. COMUNES', liq['horas_comunes'], '', haberes=liq['importe_horas_comunes'])
+        if liq.get('horas_extra_50', 0) > 0:
+            fila('HS. EXTRA 50%', liq['horas_extra_50'], '50', haberes=liq['importe_extra_50'])
+        if liq.get('horas_extra_100', 0) > 0:
+            fila('HS. EXTRA 100%', liq['horas_extra_100'], '100', haberes=liq['importe_extra_100'])
+        if liq.get('importe_antiguedad_total', 0) > 0:
+            fila('ANTIGUEDAD', '', liq.get('porcentaje_antiguedad', 0), haberes=liq['importe_antiguedad_total'])
+        if liq.get('importe_presentismo', 0) > 0:
+            fila('PRESENTISMO', '', liq.get('porcentaje_presentismo', 15), haberes=liq['importe_presentismo'])
+        if liq.get('importe_prop_aguinaldo', 0) > 0:
+            fila('PROP. AGUINALDO', '', '', haberes=liq['importe_prop_aguinaldo'])
+        if liq.get('importe_diferencia_sueldo', 0) > 0:
+            fila('DIF. SUELDO', '', '', haberes=liq['importe_diferencia_sueldo'])
+        if liq.get('importe_premio_produccion', 0) > 0:
+            fila('PREMIO PRODUCCION', '', '', haberes=liq['importe_premio_produccion'])
+        if liq.get('importe_cifra_fija', 0) > 0:
+            fila('CIFRA FIJA', '', '', haberes=liq['importe_cifra_fija'])
+        if liq.get('importe_trabajos_varios', 0) > 0:
+            fila('TRABAJOS VARIOS', '', '', haberes=liq['importe_trabajos_varios'])
+        if liq.get('importe_viaticos', 0) > 0:
+            fila('VIATICOS', '', '', haberes=liq['importe_viaticos'])
+        if liq.get('importe_remplazo_encargado', 0) > 0:
+            fila('REMPLAZO ENCARGADO', '', '', haberes=liq['importe_remplazo_encargado'])
+        if liq.get('importe_vacaciones', 0) > 0:
+            fila('VACACIONES', liq.get('dias_vacaciones', 0), '', haberes=liq['importe_vacaciones'])
+
+        # Conceptos libres: pueden ser haber (positivo) o deduccion (negativo)
+        for i in (1, 2):
+            c_nom = liq.get(f'concepto_libre_{i}_nombre') or f'C. LIBRE {i}'
+            c_imp = liq.get(f'concepto_libre_{i}_importe', 0) or 0
+            if c_imp > 0:
+                fila(c_nom, '', '', haberes=c_imp)
+            elif c_imp < 0:
+                fila(c_nom, '', '', deducciones=abs(c_imp))
+
+        # ── DEDUCCIONES ──
+        imp_jub = liq.get('importe_jubilacion', 0) or 0
+        if imp_jub != 0:
+            if imp_jub > 0:
+                fila('JUBILACION', '', '', deducciones=imp_jub)
+            else:
+                fila('JUBILACION', '', '', haberes=abs(imp_jub))
+
+        imp_os = liq.get('importe_obra_social', 0) or 0
+        if imp_os != 0:
+            if imp_os > 0:
+                fila('OBRA SOCIAL', '', '', deducciones=imp_os)
+            else:
+                fila('OBRA SOCIAL', '', '', haberes=abs(imp_os))
+
+        imp_seg = liq.get('importe_seguro', 0) or 0
+        if imp_seg != 0:
+            if imp_seg > 0:
+                fila('SEGURO', '', '', deducciones=imp_seg)
+            else:
+                fila('SEGURO', '', '', haberes=abs(imp_seg))
+
+        if liq.get('importe_anticipos', 0) > 0:
+            fila('ANTICIPOS', '', '', deducciones=liq['importe_anticipos'])
+        if liq.get('importe_acreditacion_banco', 0) > 0:
+            fila('ACREDITACION BANCO', '', '', deducciones=liq['importe_acreditacion_banco'])
+        if liq.get('importe_descuento_premio_prod', 0) > 0:
+            fila('DESC. PREM. PROD.', '', '', deducciones=liq['importe_descuento_premio_prod'])
+
+        imp_otros = liq.get('importe_otros', 0) or 0
+        if imp_otros != 0:
+            if imp_otros > 0:
+                fila('OTROS CONCEPTOS', '', '', haberes=imp_otros)
+            else:
+                fila('OTROS CONCEPTOS', '', '', deducciones=abs(imp_otros))
+
+        # Relleno para mantener estructura si hay pocas filas
+        while row_i[0] < 14:
+            fila('', '', '', 0, 0)
+
+        y = y_ref[0]
+        # Borde contenedor (header + filas)
+        self.set_draw_color(*self.SLATE_LINE)
+        self.rect(ml, y - row_h * row_i[0] - head_h, aw, row_h * row_i[0] + head_h)
+
+        # Subtotales
+        sub_h = 5
+        self._fill(ml, y, aw, sub_h, self.SUBTOTAL_BG)
         self.set_font('Helvetica', 'B', 7.5)
         self.set_xy(ml, y)
-        self.cell(cant_w, 5, 'CANTIDAD', 1, 0, 'C')
-        self.cell(conc_w, 5, 'CONCEPTO', 1, 0, 'C')
-        self.cell(imp_w, 5, 'IMPORTE ($)', 1, 1, 'C')
+        self.cell(conc_w + cant_w + pct_w, sub_h, '  SUBTOTALES', 0, 0, 'L')
+        self.cell(hab_w, sub_h, f"$ {_fmt_ar(liq.get('total_haberes', 0))}", 0, 0, 'R')
+        self.cell(ded_w, sub_h, f"$ {_fmt_ar(liq.get('total_deducciones', 0))}  ", 0, 1, 'R')
+        y += sub_h + 2
+
+        # ══════════════════════════════════════════
+        # 4. CIERRE: son pesos / neto a cobrar
+        # ══════════════════════════════════════════
+        cierre_h = 14
+        left_w = aw - 68
+        neto_w = 68
+
+        self.set_draw_color(*self.SLATE_LINE)
+        self.rect(ml, y, left_w, cierre_h)
+
+        neto_val = liq.get('total_neto', 0) or 0
+        letras = _numero_a_letras(neto_val)
+
+        self.set_font('Helvetica', 'B', 6.5)
+        self.set_text_color(*self.TEXT_MUTED)
+        self.set_xy(ml + 2, y + 1)
+        self.cell(left_w - 4, 3, 'SON PESOS', 0, 1, 'L')
         self.set_text_color(0, 0, 0)
-        y += 5
+        self.set_font('Helvetica', 'B', 7.5)
+        self.set_xy(ml + 2, y + 4)
+        self.cell(left_w - 4, 3.5, _ascii(letras + ' CON 00/100'), 0, 1, 'L')
 
-        row_h = 3.8
-        row_count = 0
-
-        def fila(cant, conc, imp, neg=False):
-            nonlocal y, row_count
-            if row_count % 2 == 1:
-                self._fill_rect(ml, y, aw, row_h, 248, 250, 252)
-            
-            self.set_font('Helvetica', '', 8)
-            self.set_xy(ml, y)
-            
-            c_str = f"{cant:.1f}" if (isinstance(cant, (int, float)) and cant != 0) else ""
-            i_str = _fmt_ar(abs(imp)) if imp != 0 else ""
-            if neg and i_str: i_str = f"- {i_str}"
-
-            self.cell(cant_w, row_h, c_str, 'LR', 0, 'C')
-            self.cell(conc_w, row_h, f" {_ascii(conc)}", 'LR', 0, 'L')
-            self.cell(imp_w, row_h, i_str, 'LR', 1, 'R')
-            y += row_h
-            row_count += 1
-
-        # Lista de conceptos
-        if liq.get('importe_basico_mensual', 0) > 0:
-            fila(liq.get('dias_trabajados', 0), 'DS. MENSUALES', liq['importe_basico_mensual'])
-        if liq.get('horas_comunes', 0) > 0: fila(liq['horas_comunes'], 'HS. COMUNES', liq['importe_horas_comunes'])
-        if liq.get('horas_extra_50', 0) > 0: fila(liq['horas_extra_50'], 'HS. EXTRA 50%', liq['importe_extra_50'])
-        if liq.get('horas_extra_100', 0) > 0: fila(liq['horas_extra_100'], 'HS. EXTRA 100%', liq['importe_extra_100'])
-        if liq.get('importe_antiguedad_total', 0) > 0:
-            pct = liq.get('porcentaje_antiguedad', 0)
-            fila('', f'ANTIGUEDAD ({pct}%)', liq['importe_antiguedad_total'])
-        if liq.get('importe_presentismo', 0) > 0:
-            pct_p = liq.get('porcentaje_presentismo', 15)
-            # Quitar decimales si es .0
-            if float(pct_p) == int(float(pct_p)): pct_p = int(float(pct_p))
-            fila('', f'PRESENTISMO ({pct_p}%)', liq['importe_presentismo'])
-        if liq.get('importe_prop_aguinaldo', 0) > 0: fila('', 'PROP. AGUINALDO', liq['importe_prop_aguinaldo'])
-        if liq.get('importe_diferencia_sueldo', 0) > 0: fila('', 'DIF. SUELDO', liq['importe_diferencia_sueldo'])
-        if liq.get('importe_premio_produccion', 0) > 0: fila('', 'PREMIO PRODUCCION', liq['importe_premio_produccion'])
-        if liq.get('importe_cifra_fija', 0) > 0: fila('', 'CIFRA FIJA', liq['importe_cifra_fija'])
-        if liq.get('importe_trabajos_varios', 0) > 0: fila('', 'TRABAJOS VARIOS', liq['importe_trabajos_varios'])
-        if liq.get('importe_viaticos', 0) > 0: fila('', 'VIATICOS', liq['importe_viaticos'])
-        if liq.get('importe_remplazo_encargado', 0) > 0: fila('', 'REMPLAZO ENCARGADO', liq['importe_remplazo_encargado'])
-        if liq.get('importe_vacaciones', 0) > 0:
-            fila(liq.get('dias_vacaciones', 0), 'VACACIONES', liq['importe_vacaciones'])
-        
-        # Conceptos libres
-        for i in [1, 2]:
-            c_nom = liq.get(f'concepto_libre_{i}_nombre')
-            c_imp = liq.get(f'concepto_libre_{i}_importe', 0)
-            if c_imp != 0:
-                fila('', c_nom or f'C. LIBRE {i}', abs(c_imp), neg=(c_imp < 0))
-
-        if liq.get('importe_jubilacion', 0) != 0:
-            imp_jub = liq['importe_jubilacion']
-            fila('', 'JUBILACION', abs(imp_jub), neg=(imp_jub < 0))
-        
-        if liq.get('importe_obra_social', 0) != 0:
-            imp_os = liq['importe_obra_social']
-            fila('', 'OBRA SOCIAL', abs(imp_os), neg=(imp_os < 0))
-            
-        if liq.get('importe_seguro', 0) != 0:
-            imp_seg = liq['importe_seguro']
-            fila('', 'SEGURO', abs(imp_seg), neg=(imp_seg < 0))
-        
-        # Nuevos Conceptos
-        if liq.get('importe_anticipos', 0) > 0:
-            fila('', 'ANTICIPOS', liq['importe_anticipos'], neg=True)
-        
-        if liq.get('importe_acreditacion_banco', 0) > 0:
-            fila('', 'ACREDITACION BANCO', liq['importe_acreditacion_banco'], neg=True)
-        
-        if liq.get('importe_descuento_premio_prod', 0) > 0:
-            fila('', 'DESC. PREM. PROD.', liq['importe_descuento_premio_prod'], neg=True)
-        
-        imp_otros = liq.get('importe_otros', 0)
-        if imp_otros != 0:
-            fila('', 'OTROS CONCEPTOS', abs(imp_otros), neg=(imp_otros < 0))
-
-        # Completar espacio de tabla si hay pocas filas para mantener estructura
-        while row_count < 10:
-            fila('', '', 0)
-
-        self.line(ml, y, ml + aw, y) # Cierre tabla
-
-        # TOTALES Y FIRMA
-        y += 2
-        total_box_w = 60
-        self.set_xy(ml + aw - total_box_w, y)
-        self._fill_rect(ml + aw - total_box_w, y, total_box_w, 18, 248, 250, 252)
-        self.rect(ml + aw - total_box_w, y, total_box_w, 18)
-        
-        self.set_font('Helvetica', '', 8)
-        self.set_xy(ml + aw - total_box_w + 2, y + 1)
-        self.cell(total_box_w - 4, 4, 'TOTAL HABERES', 0, 0)
-        self.cell(0, 4, f"$ {_fmt_ar(liq.get('total_haberes', 0))}", 0, 1, 'R')
-        
-        self.set_xy(ml + aw - total_box_w + 2, y + 5)
-        self.cell(total_box_w - 4, 4, 'DEDUCCIONES', 0, 0)
-        self.cell(0, 4, f"$ {_fmt_ar(liq.get('total_deducciones', 0))}", 0, 1, 'R')
-        
-        self.line(ml + aw - total_box_w + 2, y + 10, ml + aw - 2, y + 10)
-        
-        self.set_font('Helvetica', 'B', 9)
-        self.set_xy(ml + aw - total_box_w + 2, y + 11)
-        self.cell(total_box_w - 4, 6, 'NETO A COBRAR', 0, 0)
-        self.cell(0, 6, f"$ {_fmt_ar(liq.get('total_neto', 0))}", 0, 1, 'R')
-
-        # FIRMA - Mas espacio vertical para firmar
-        firma_y = page_h - 12 # 12mm desde el fondo
+        hoy_str = datetime.now().strftime('%d/%m/%Y')
+        self.set_font('Helvetica', '', 7)
+        self.set_text_color(*self.TEXT_MUTED)
+        self.set_xy(ml + 2, y + 8.5)
+        self.cell(left_w - 4, 3, 'LUGAR Y FECHA DE PAGO', 0, 1, 'L')
+        self.set_text_color(0, 0, 0)
         self.set_font('Helvetica', 'B', 8)
-        self.set_xy(ml, firma_y - 10) # Mas espacio antes de la linea
-        self.cell(aw, 4, 'RECIBI CONFORME EL IMPORTE DEL PRESENTE', 0, 1, 'R')
-        
-        # Observaciones al pie
-        obs = liq.get('observaciones', '')
+        self.set_xy(ml + 2, y + 11)
+        self.cell(left_w - 4, 3, f'V.G. GALVEZ,  {hoy_str}', 0, 1, 'L')
+
+        neto_x = ml + left_w + 2
+        neto_real_w = neto_w - 2
+        self._fill(neto_x, y, neto_real_w, cierre_h, self.ACCENT_BG)
+        self.set_draw_color(*self.SLATE_DARK)
+        self.rect(neto_x, y, neto_real_w, cierre_h)
+
+        self.set_font('Helvetica', 'B', 7)
+        self.set_text_color(*self.TEXT_MUTED)
+        self.set_xy(neto_x, y + 1)
+        self.cell(neto_real_w, 3, 'NETO A COBRAR', 0, 1, 'C')
+        self.set_text_color(*self.SLATE_DARK)
+        self.set_font('Helvetica', 'B', 16)
+        self.set_xy(neto_x, y + 4.5)
+        self.cell(neto_real_w, 8, f'$ {_fmt_ar(neto_val)}', 0, 1, 'C')
+
+        self.set_text_color(0, 0, 0)
+        y += cierre_h + 1
+
+        # ══════════════════════════════════════════
+        # 5. OBSERVACIONES + FIRMA UNICA DEL EMPLEADO
+        # ══════════════════════════════════════════
+        obs = liq.get('observaciones', '') or ''
         if obs:
             self.set_font('Helvetica', 'I', 6.5)
-            self.set_xy(ml, firma_y - 6)
-            self.cell(aw - 65, 4, f"OBS: {_ascii(obs)}", 0, 0, 'L')
-        
-        # Fecha y lugar de pago
-        self.set_font('Helvetica', '', 7.5)
-        self.set_xy(ml, firma_y)
-        self.cell(100, 4, f'Lugar y fecha de pago: V.G. GALVEZ, {hoy_str}', 0, 0, 'L')
+            self.set_text_color(*self.TEXT_MUTED)
+            self.set_xy(ml, y)
+            self.cell(aw, 3, f'Observaciones: {_ascii(obs)}', 0, 1, 'L')
+            self.set_text_color(0, 0, 0)
+            y += 3
 
-        self.line(ml + aw - 60, firma_y, ml + aw - 5, firma_y)
-        self.set_xy(ml + aw - 60, firma_y + 1)
-        self.cell(55, 4, 'FIRMA', 0, 0, 'C')
-        # Apellido y nombre completo debajo de FIRMA
-        self.set_font('Helvetica', 'B', 7)
-        self.set_xy(ml + aw - 60, firma_y + 5)
-        self.cell(55, 4, _ascii(empleado.get('apellido_nombre', '')), 0, 0, 'C')
+        # Leyenda Art. 140 LCT
+        legend_y = page_h - 22
+        self.set_font('Helvetica', 'I', 6)
+        self.set_text_color(*self.TEXT_MUTED)
+        self.set_xy(ml, legend_y)
+        self.cell(aw, 3, 'Recibi conforme el importe del presente recibo - Art. 140 L.C.T.', 0, 1, 'R')
+        self.set_text_color(0, 0, 0)
+
+        # Firma UNICA del empleado, centrada y mas abajo
+        firma_y = page_h - 11
+        f_w = 85
+        f_x = ml + (aw - f_w) / 2
+        self.set_draw_color(120, 120, 120)
+        self.line(f_x, firma_y, f_x + f_w, firma_y)
+        self.set_font('Helvetica', 'B', 7.5)
+        self.set_xy(f_x, firma_y + 0.8)
+        self.cell(f_w, 3, 'FIRMA  DEL  EMPLEADO', 0, 0, 'C')
+        # Apellido y nombre en fuente mas grande
+        self.set_font('Helvetica', 'B', 9)
+        self.set_text_color(0, 0, 0)
+        self.set_xy(f_x, firma_y + 4.2)
+        self.cell(f_w, 3.5, nombre, 0, 0, 'C')
+        self.set_font('Helvetica', '', 6.5)
+        self.set_text_color(*self.TEXT_MUTED)
+        self.set_xy(f_x, firma_y + 7.8)
+        self.cell(f_w, 2.5, f'CUIL {cuil}', 0, 0, 'C')
+        self.set_text_color(0, 0, 0)
+
 
 
 def generar_recibos_pdf(liquidaciones, empleados_dict, periodo):
