@@ -2790,20 +2790,39 @@ with tab_informes:
                 with st.expander("⚙️ Gestión de Cuentas Contables", expanded=False):
                     st.markdown("Configurá el código y nombre contable para cada sección/concepto.")
                     cuentas = db.get_cuentas_asiento()
+                    # Agrupar por (codigo, nombre, tipo) para no mostrar los alias repetidos.
+                    # En la DB existen claves abreviadas ('ADMINIST.', 'CALIDAD', etc.) que apuntan
+                    # al mismo codigo/nombre para permitir el matching del asiento contable.
+                    # Las mostramos como una sola fila y al guardar actualizamos todas las claves
+                    # del grupo para mantenerlas sincronizadas.
+                    grupos_cta = {}
+                    orden_grupos = []
                     for cta in cuentas:
-                        with st.form(f"form_cta_{cta['id']}"):
+                        key = (cta['codigo'], cta['nombre'], cta['tipo'])
+                        if key not in grupos_cta:
+                            grupos_cta[key] = []
+                            orden_grupos.append(key)
+                        grupos_cta[key].append(cta)
+
+                    for key in orden_grupos:
+                        items = grupos_cta[key]
+                        primary = items[0]
+                        claves_grupo = [x['clave'] for x in items]
+                        claves_label = ' / '.join(claves_grupo)
+                        with st.form(f"form_cta_grp_{primary['id']}"):
                             c1, c2, c3, c4 = st.columns([2, 4, 1, 1])
                             with c1:
-                                nuevo_cod = st.text_input("Código", value=cta['codigo'], key=f"acc_cod_{cta['id']}")
+                                nuevo_cod = st.text_input("Código", value=primary['codigo'], key=f"acc_cod_g_{primary['id']}")
                             with c2:
-                                nuevo_nom = st.text_input("Nombre", value=cta['nombre'], key=f"acc_nom_{cta['id']}")
+                                nuevo_nom = st.text_input("Nombre", value=primary['nombre'], key=f"acc_nom_g_{primary['id']}")
                             with c3:
-                                nuevo_tipo = st.selectbox("Tipo", ["D", "H"], index=0 if cta['tipo'] == 'D' else 1, key=f"acc_tip_{cta['id']}")
+                                nuevo_tipo = st.selectbox("Tipo", ["D", "H"], index=0 if primary['tipo'] == 'D' else 1, key=f"acc_tip_g_{primary['id']}")
                             with c4:
-                                st.markdown(f"**`{cta['clave']}`**")
+                                st.markdown(f"**`{claves_label}`**")
                             if st.form_submit_button("💾 Guardar"):
-                                db.guardar_cuenta_asiento(cta['clave'], nuevo_cod, nuevo_nom, nuevo_tipo)
-                                st.success(f"✅ Actualizado: {cta['clave']}")
+                                for clv in claves_grupo:
+                                    db.guardar_cuenta_asiento(clv, nuevo_cod, nuevo_nom, nuevo_tipo)
+                                st.success(f"✅ Actualizado: {claves_label}")
                                 st.rerun()
 
                     # Nueva cuenta

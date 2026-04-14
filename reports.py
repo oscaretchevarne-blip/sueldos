@@ -254,13 +254,12 @@ class ReciboPDF(FPDF):
         y += ficha_h + 2
 
         # ══════════════════════════════════════════
-        # 3. TABLA DE CONCEPTOS (Haberes / Deducciones separadas)
+        # 3. TABLA DE CONCEPTOS (columna unica, igual que el original)
         # ══════════════════════════════════════════
-        conc_w = 78
-        cant_w = 22
-        pct_w  = 14
-        hab_w  = 35
-        ded_w  = aw - conc_w - cant_w - pct_w - hab_w
+        conc_w = 110
+        cant_w = 24
+        pct_w  = 16
+        imp_w  = aw - conc_w - cant_w - pct_w
 
         head_h = 5.5
         self._fill(ml, y, aw, head_h, self.SLATE_MID)
@@ -270,8 +269,7 @@ class ReciboPDF(FPDF):
         self.cell(conc_w, head_h, '  CONCEPTO', 0, 0, 'L')
         self.cell(cant_w, head_h, 'CANT. / REF.', 0, 0, 'C')
         self.cell(pct_w,  head_h, '%', 0, 0, 'C')
-        self.cell(hab_w,  head_h, 'HABERES', 0, 0, 'R')
-        self.cell(ded_w,  head_h, 'DEDUCCIONES  ', 0, 1, 'R')
+        self.cell(imp_w,  head_h, 'IMPORTE  ', 0, 1, 'R')
         self.set_text_color(0, 0, 0)
         y += head_h
 
@@ -279,7 +277,7 @@ class ReciboPDF(FPDF):
         y_ref = [y]
         row_i = [0]
 
-        def fila(concepto, cant='', pct='', haberes=0, deducciones=0):
+        def fila(concepto, cant='', pct='', imp=0, neg=False):
             cy = y_ref[0]
             if row_i[0] % 2 == 1:
                 self._fill(ml, cy, aw, row_h, self.SLATE_SOFT)
@@ -300,103 +298,100 @@ class ReciboPDF(FPDF):
                 except Exception:
                     p_str = f'{pct}%'
             self.cell(pct_w, row_h, p_str, 0, 0, 'C')
-            self.cell(hab_w, row_h, (_fmt_ar(haberes) if haberes else ''), 0, 0, 'R')
-            self.cell(ded_w, row_h, ((_fmt_ar(deducciones) + '  ') if deducciones else ''), 0, 1, 'R')
+            if imp:
+                i_str = _fmt_ar(abs(imp))
+                if neg:
+                    i_str = '- ' + i_str
+                i_str += '  '
+            else:
+                i_str = ''
+            self.cell(imp_w, row_h, i_str, 0, 1, 'R')
             y_ref[0] += row_h
             row_i[0] += 1
 
-        # ── HABERES ──
+        # ── CONCEPTOS (mismo orden y logica que el original — sin clasificar) ──
         if liq.get('importe_basico_mensual', 0) > 0:
-            fila('DS. MENSUALES', liq.get('dias_trabajados', 0), '', haberes=liq['importe_basico_mensual'])
+            fila('DS. MENSUALES', liq.get('dias_trabajados', 0), '', imp=liq['importe_basico_mensual'])
         if liq.get('horas_comunes', 0) > 0:
-            fila('HS. COMUNES', liq['horas_comunes'], '', haberes=liq['importe_horas_comunes'])
+            fila('HS. COMUNES', liq['horas_comunes'], '', imp=liq['importe_horas_comunes'])
         if liq.get('horas_extra_50', 0) > 0:
-            fila('HS. EXTRA 50%', liq['horas_extra_50'], '50', haberes=liq['importe_extra_50'])
+            fila('HS. EXTRA 50%', liq['horas_extra_50'], '50', imp=liq['importe_extra_50'])
         if liq.get('horas_extra_100', 0) > 0:
-            fila('HS. EXTRA 100%', liq['horas_extra_100'], '100', haberes=liq['importe_extra_100'])
+            fila('HS. EXTRA 100%', liq['horas_extra_100'], '100', imp=liq['importe_extra_100'])
         if liq.get('importe_antiguedad_total', 0) > 0:
-            fila('ANTIGUEDAD', '', liq.get('porcentaje_antiguedad', 0), haberes=liq['importe_antiguedad_total'])
+            fila('ANTIGUEDAD', '', liq.get('porcentaje_antiguedad', 0), imp=liq['importe_antiguedad_total'])
         if liq.get('importe_presentismo', 0) > 0:
-            fila('PRESENTISMO', '', liq.get('porcentaje_presentismo', 15), haberes=liq['importe_presentismo'])
+            fila('PRESENTISMO', '', liq.get('porcentaje_presentismo', 15), imp=liq['importe_presentismo'])
         if liq.get('importe_prop_aguinaldo', 0) > 0:
-            fila('PROP. AGUINALDO', '', '', haberes=liq['importe_prop_aguinaldo'])
+            fila('PROP. AGUINALDO', '', '', imp=liq['importe_prop_aguinaldo'])
         if liq.get('importe_diferencia_sueldo', 0) > 0:
-            fila('DIF. SUELDO', '', '', haberes=liq['importe_diferencia_sueldo'])
+            fila('DIF. SUELDO', '', '', imp=liq['importe_diferencia_sueldo'])
         if liq.get('importe_premio_produccion', 0) > 0:
-            fila('PREMIO PRODUCCION', '', '', haberes=liq['importe_premio_produccion'])
+            fila('PREMIO PRODUCCION', '', '', imp=liq['importe_premio_produccion'])
         if liq.get('importe_cifra_fija', 0) > 0:
-            fila('CIFRA FIJA', '', '', haberes=liq['importe_cifra_fija'])
+            fila('CIFRA FIJA', '', '', imp=liq['importe_cifra_fija'])
         if liq.get('importe_trabajos_varios', 0) > 0:
-            fila('TRABAJOS VARIOS', '', '', haberes=liq['importe_trabajos_varios'])
+            fila('TRABAJOS VARIOS', '', '', imp=liq['importe_trabajos_varios'])
         if liq.get('importe_viaticos', 0) > 0:
-            fila('VIATICOS', '', '', haberes=liq['importe_viaticos'])
+            fila('VIATICOS', '', '', imp=liq['importe_viaticos'])
         if liq.get('importe_remplazo_encargado', 0) > 0:
-            fila('REMPLAZO ENCARGADO', '', '', haberes=liq['importe_remplazo_encargado'])
+            fila('REMPLAZO ENCARGADO', '', '', imp=liq['importe_remplazo_encargado'])
         if liq.get('importe_vacaciones', 0) > 0:
-            fila('VACACIONES', liq.get('dias_vacaciones', 0), '', haberes=liq['importe_vacaciones'])
+            fila('VACACIONES', liq.get('dias_vacaciones', 0), '', imp=liq['importe_vacaciones'])
 
-        # Conceptos libres: pueden ser haber (positivo) o deduccion (negativo)
+        # Conceptos libres (respetan signo tal cual vienen del calculo)
         for i in (1, 2):
             c_nom = liq.get(f'concepto_libre_{i}_nombre') or f'C. LIBRE {i}'
             c_imp = liq.get(f'concepto_libre_{i}_importe', 0) or 0
-            if c_imp > 0:
-                fila(c_nom, '', '', haberes=c_imp)
-            elif c_imp < 0:
-                fila(c_nom, '', '', deducciones=abs(c_imp))
+            if c_imp != 0:
+                fila(c_nom, '', '', imp=abs(c_imp), neg=(c_imp < 0))
 
-        # ── DEDUCCIONES ──
-        imp_jub = liq.get('importe_jubilacion', 0) or 0
-        if imp_jub != 0:
-            if imp_jub > 0:
-                fila('JUBILACION', '', '', deducciones=imp_jub)
-            else:
-                fila('JUBILACION', '', '', haberes=abs(imp_jub))
+        # JUBILACION / OBRA SOCIAL / SEGURO — mismo criterio que el original:
+        # se muestran siempre, con signo segun como venga el importe del calculo.
+        if liq.get('importe_jubilacion', 0) != 0:
+            imp_jub = liq['importe_jubilacion']
+            fila('JUBILACION', '', '', imp=abs(imp_jub), neg=(imp_jub < 0))
 
-        imp_os = liq.get('importe_obra_social', 0) or 0
-        if imp_os != 0:
-            if imp_os > 0:
-                fila('OBRA SOCIAL', '', '', deducciones=imp_os)
-            else:
-                fila('OBRA SOCIAL', '', '', haberes=abs(imp_os))
+        if liq.get('importe_obra_social', 0) != 0:
+            imp_os = liq['importe_obra_social']
+            fila('OBRA SOCIAL', '', '', imp=abs(imp_os), neg=(imp_os < 0))
 
-        imp_seg = liq.get('importe_seguro', 0) or 0
-        if imp_seg != 0:
-            if imp_seg > 0:
-                fila('SEGURO', '', '', deducciones=imp_seg)
-            else:
-                fila('SEGURO', '', '', haberes=abs(imp_seg))
+        if liq.get('importe_seguro', 0) != 0:
+            imp_seg = liq['importe_seguro']
+            fila('SEGURO', '', '', imp=abs(imp_seg), neg=(imp_seg < 0))
 
         if liq.get('importe_anticipos', 0) > 0:
-            fila('ANTICIPOS', '', '', deducciones=liq['importe_anticipos'])
+            fila('ANTICIPOS', '', '', imp=liq['importe_anticipos'], neg=True)
         if liq.get('importe_acreditacion_banco', 0) > 0:
-            fila('ACREDITACION BANCO', '', '', deducciones=liq['importe_acreditacion_banco'])
+            fila('ACREDITACION BANCO', '', '', imp=liq['importe_acreditacion_banco'], neg=True)
         if liq.get('importe_descuento_premio_prod', 0) > 0:
-            fila('DESC. PREM. PROD.', '', '', deducciones=liq['importe_descuento_premio_prod'])
+            fila('DESC. PREM. PROD.', '', '', imp=liq['importe_descuento_premio_prod'], neg=True)
 
         imp_otros = liq.get('importe_otros', 0) or 0
         if imp_otros != 0:
-            if imp_otros > 0:
-                fila('OTROS CONCEPTOS', '', '', haberes=imp_otros)
-            else:
-                fila('OTROS CONCEPTOS', '', '', deducciones=abs(imp_otros))
+            fila('OTROS CONCEPTOS', '', '', imp=abs(imp_otros), neg=(imp_otros < 0))
 
         # Relleno para mantener estructura si hay pocas filas
         while row_i[0] < 14:
-            fila('', '', '', 0, 0)
+            fila('', '', '', 0)
 
         y = y_ref[0]
         # Borde contenedor (header + filas)
         self.set_draw_color(*self.SLATE_LINE)
         self.rect(ml, y - row_h * row_i[0] - head_h, aw, row_h * row_i[0] + head_h)
 
-        # Subtotales
-        sub_h = 5
+        # Totales (Haberes / Deducciones, como en el original) — vienen del calculo
+        sub_h = 4.6
         self._fill(ml, y, aw, sub_h, self.SUBTOTAL_BG)
         self.set_font('Helvetica', 'B', 7.5)
         self.set_xy(ml, y)
-        self.cell(conc_w + cant_w + pct_w, sub_h, '  SUBTOTALES', 0, 0, 'L')
-        self.cell(hab_w, sub_h, f"$ {_fmt_ar(liq.get('total_haberes', 0))}", 0, 0, 'R')
-        self.cell(ded_w, sub_h, f"$ {_fmt_ar(liq.get('total_deducciones', 0))}  ", 0, 1, 'R')
+        self.cell(conc_w + cant_w + pct_w, sub_h, '  TOTAL HABERES', 0, 0, 'L')
+        self.cell(imp_w, sub_h, f"$ {_fmt_ar(liq.get('total_haberes', 0))}  ", 0, 1, 'R')
+        y += sub_h
+        self._fill(ml, y, aw, sub_h, self.SUBTOTAL_BG)
+        self.set_xy(ml, y)
+        self.cell(conc_w + cant_w + pct_w, sub_h, '  TOTAL DEDUCCIONES', 0, 0, 'L')
+        self.cell(imp_w, sub_h, f"- $ {_fmt_ar(liq.get('total_deducciones', 0))}  ", 0, 1, 'R')
         y += sub_h + 2
 
         # ══════════════════════════════════════════
