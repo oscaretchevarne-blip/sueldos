@@ -214,8 +214,9 @@ class ReciboPDF(FPDF):
             self.set_xy(x, y + 16)
             self.cell(col_w3, 2.5, lb, 0, 0, 'L')
             self.set_text_color(0, 0, 0)
-            self.set_font('Helvetica', 'B', 8)
-            self.set_xy(x, y + 17.8)
+            # Reducir fuente y bajar 1 mm para evitar superposicion con el label
+            self.set_font('Helvetica', 'B', 7.5)
+            self.set_xy(x, y + 18.8)
             self.cell(col_w3, 2.5, _ascii(str(vl)), 0, 0, 'L')
 
         # Tag de PERIODO a la derecha
@@ -417,13 +418,15 @@ class ReciboPDF(FPDF):
         self.cell(left_w - 4, 3.5, _ascii(letras + ' CON 00/100'), 0, 1, 'L')
 
         hoy_str = datetime.now().strftime('%d/%m/%Y')
-        self.set_font('Helvetica', '', 7)
+        # Reducir un poco la fuente del label para que no se pise con el valor
+        self.set_font('Helvetica', '', 6.5)
         self.set_text_color(*self.TEXT_MUTED)
         self.set_xy(ml + 2, y + 8.5)
         self.cell(left_w - 4, 3, 'LUGAR Y FECHA DE PAGO', 0, 1, 'L')
         self.set_text_color(0, 0, 0)
-        self.set_font('Helvetica', 'B', 8)
-        self.set_xy(ml + 2, y + 11)
+        # Reducir fuente y bajar 1 mm para evitar superposicion con el label
+        self.set_font('Helvetica', 'B', 7.5)
+        self.set_xy(ml + 2, y + 12)
         self.cell(left_w - 4, 3, f'V.G. GALVEZ,  {hoy_str}', 0, 1, 'L')
 
         neto_x = ml + left_w + 2
@@ -457,7 +460,9 @@ class ReciboPDF(FPDF):
             y += 3
 
         # Leyenda Art. 140 LCT
-        legend_y = page_h - 22
+        # Se baja para que no quede pegada al recuadro del NETO A COBRAR.
+        # Si por algun motivo el flujo (y) ya paso mas abajo, respetamos ese minimo.
+        legend_y = max(y + 4, page_h - 17)
         self.set_font('Helvetica', 'I', 6)
         self.set_text_color(*self.TEXT_MUTED)
         self.set_xy(ml, legend_y)

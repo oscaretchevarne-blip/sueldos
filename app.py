@@ -1980,24 +1980,128 @@ with tab_liq:
 
             with t2:
                 st.markdown("##### 🚀 Ejecutar Liquidación en Lote")
-                alcance = st.radio("Alcance de la liquidación", ["Toda la Nómina", "Por Sector"], horizontal=True)
+                alcance = st.radio(
+                    "Alcance de la liquidación",
+                    ["Toda la Nómina", "Por Sector", "Empleados Seleccionados"],
+                    horizontal=True,
+                    key="alcance_liq"
+                )
                 sector_sel = None
+                ids_seleccionados = []
+
                 if alcance == "Por Sector":
                     sector_sel = st.selectbox("Seleccionar Sector", db.get_secciones(), key="alcance_sector")
-                
+
+                elif alcance == "Empleados Seleccionados":
+                    st.markdown("**Tildá los empleados a liquidar:**")
+
+                    # Estado persistido de selección (diccionario id -> bool)
+                    if 'sel_emps_masivo' not in st.session_state:
+                        st.session_state['sel_emps_masivo'] = {}
+                    sel_state = st.session_state['sel_emps_masivo']
+
+                    # --- Leer ediciones del data_editor ANTES de reconstruir el df base ---
+                    # Así evitamos que el editor "salte" al tope al reconstruir.
+                    editor_state = st.session_state.get('editor_sel_emps', None)
+                    if editor_state and isinstance(editor_state, dict):
+                        edited_rows = editor_state.get('edited_rows', {})
+                        base_df_prev = st.session_state.get('_sel_base_df_prev')
+                        if edited_rows and base_df_prev is not None:
+                            for row_idx, changes in edited_rows.items():
+                                if 'Seleccionar' in changes:
+                                    try:
+                                        eid_edit = int(base_df_prev.iloc[int(row_idx)]['_id'])
+                                        sel_state[eid_edit] = bool(changes['Seleccionar'])
+                                    except Exception:
+                                        pass
+
+                    # Filtro opcional por sector para achicar la lista
+                    secciones_disp = ["(Todos los sectores)"] + db.get_secciones()
+                    filtro_sec = st.selectbox(
+                        "Filtrar por sector (opcional)",
+                        secciones_disp,
+                        key="filtro_sec_sel"
+                    )
+
+                    emps_filtrados = empleados_activos if filtro_sec == "(Todos los sectores)" \
+                        else [e for e in empleados_activos if e['seccion'] == filtro_sec]
+
+                    # Botones rápidos de selección
+                    c_sel1, c_sel2, _ = st.columns([1, 1, 3])
+                    accion_masiva = None
+                    with c_sel1:
+                        if st.button("✅ Seleccionar todos", key="btn_sel_todos"):
+                            accion_masiva = True
+                    with c_sel2:
+                        if st.button("❌ Quitar todos", key="btn_sel_ninguno"):
+                            accion_masiva = False
+
+                    if accion_masiva is not None:
+                        for e in emps_filtrados:
+                            sel_state[e['id']] = accion_masiva
+                        # Forzar reseteo del estado interno del editor para reflejar cambio
+                        if 'editor_sel_emps' in st.session_state:
+                            del st.session_state['editor_sel_emps']
+
+                    # Determinar si hace falta reconstruir el DataFrame base.
+                    # Solo se reconstruye si cambió el filtro o se usó un botón masivo.
+                    filtro_actual_key = (
+                        filtro_sec,
+                        tuple((e['id']) for e in emps_filtrados),
+                        accion_masiva is not None,
+                    )
+                    if st.session_state.get('_sel_base_df_key') != filtro_actual_key \
+                            or st.session_state.get('_sel_base_df_prev') is None:
+                        st.session_state['_sel_base_df_key'] = filtro_actual_key
+                        st.session_state['_sel_base_df_prev'] = pd.DataFrame([
+                            {
+                                "Seleccionar": bool(sel_state.get(e['id'], False)),
+                                "Legajo": e.get('legajo', ''),
+                                "Apellido y Nombre": e['apellido_nombre'],
+                                "Sector": e['seccion'],
+                                "_id": e['id'],
+                            }
+                            for e in emps_filtrados
+                        ])
+
+                    df_sel = st.session_state['_sel_base_df_prev']
+
+                    st.data_editor(
+                        df_sel,
+                        hide_index=True,
+                        use_container_width=True,
+                        height=350,
+                        column_config={
+                            "Seleccionar": st.column_config.CheckboxColumn("✔", help="Tildar para liquidar"),
+                            "Legajo": st.column_config.TextColumn("Legajo", disabled=True),
+                            "Apellido y Nombre": st.column_config.TextColumn("Apellido y Nombre", disabled=True),
+                            "Sector": st.column_config.TextColumn("Sector", disabled=True),
+                            "_id": None,  # columna oculta
+                        },
+                        key="editor_sel_emps",
+                    )
+
+                    st.session_state['sel_emps_masivo'] = sel_state
+                    ids_seleccionados = [eid for eid, marcado in sel_state.items() if marcado]
+                    st.caption(f"📌 **{len(ids_seleccionados)}** empleado(s) seleccionado(s).")
+
                 st.info("""
                 Esta acción procesará a todos los empleados del alcance seleccionado aplicando:
                 1. Novedades importadas de Excel (si existen).
                 2. Datos fijos (premios, seguros, etc.) de la ficha del empleado.
                 3. Valores por defecto (ej: 30 días para mensualizados/gerentes).
                 """)
-                
-                if st.button("🔥 Iniciar Liquidación Masiva", use_container_width=True):
+
+                btn_disabled = (alcance == "Empleados Seleccionados" and not ids_seleccionados)
+                if st.button("🔥 Iniciar Liquidación Masiva", use_container_width=True, disabled=btn_disabled):
                     # Filtrar empleados por alcance
                     if alcance == "Toda la Nómina":
                         emps_a_liquidar = empleados_activos
-                    else:
+                    elif alcance == "Por Sector":
                         emps_a_liquidar = [e for e in empleados_activos if e['seccion'] == sector_sel]
+                    else:  # Empleados Seleccionados
+                        set_ids = set(ids_seleccionados)
+                        emps_a_liquidar = [e for e in empleados_activos if e['id'] in set_ids]
                     
                     num_liq = 0
                     bar_progress = st.progress(0)
